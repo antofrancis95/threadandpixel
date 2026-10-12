@@ -1,0 +1,9 @@
+.env
+.env.*
+.venv/
+__pycache__/
+tests/
+scripts/
+*.json
+*.png
+*.jpg

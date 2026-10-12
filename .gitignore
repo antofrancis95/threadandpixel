@@ -1,0 +1,21 @@
+# Credentials - never commit
+*-service.json
+*service-account*.json
+*.pem
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# Local generated assets
+tmp/
+*.log

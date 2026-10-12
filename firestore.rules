@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function isFactory() { return signedIn() && request.auth.token.role == 'factory'; }
+    function ownsDesign(id) {
+      return signedIn() && get(/databases/$(db)/documents/designs/$(id)).data.uid == request.auth.uid;
+    }
+
+    match /designs/{id} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      match /{sub=**} {
+        allow read: if ownsDesign(id);
+      }
+    }
+
+    match /orders/{id} {
+      allow read: if isFactory() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isFactory()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['new', 'cutting', 'sewing', 'shipped'];
+    }
+
+    // Everything else (including all creates) goes through the API with the Admin SDK.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
