@@ -20,15 +20,21 @@ def owned_design(design_id: str, user: User) -> tuple[firestore.DocumentReferenc
     return ref, snap.to_dict()
 
 
-def history(ref: firestore.DocumentReference, limit: int = 20) -> list[dict]:
+def history(ref: firestore.DocumentReference, limit: int = 50) -> list[dict]:
+    snap = ref.get()
+    if snap.exists:
+        data = snap.to_dict() or {}
+        msgs = data.get("messages")
+        if isinstance(msgs, list) and len(msgs) > 0:
+            return msgs[-limit:]
     snaps = ref.collection("messages").order_by("ts", direction=firestore.Query.DESCENDING).limit(limit).stream()
     return [{"role": s.get("role"), "text": s.get("text")} for s in reversed(list(snaps))]
 
 
 def save_turn(ref: firestore.DocumentReference, user_text: str, reply: str) -> None:
     batch = db().batch()
-    batch.set(ref.collection("messages").document(), {"role": "user", "text": user_text, "ts": firestore.SERVER_TIMESTAMP})
-    batch.set(ref.collection("messages").document(), {"role": "model", "text": reply, "ts": firestore.SERVER_TIMESTAMP})
+    batch.set(ref.collection("messages").document(), {"role": "user", "text": user_text, "ts": firestore.SERVER_TIMESTAMP, "seq": 1})
+    batch.set(ref.collection("messages").document(), {"role": "model", "text": reply, "ts": firestore.SERVER_TIMESTAMP, "seq": 2})
     batch.commit()
 
 
@@ -40,7 +46,13 @@ def add_version(ref: firestore.DocumentReference, version: int, image: bytes, mi
     return path
 
 
-def design_response(ref_id: str, data: dict, reply: str | None = None, transcript: str | None = None) -> dict:
+def design_response(
+    ref_id: str,
+    data: dict,
+    reply: str | None = None,
+    transcript: str | None = None,
+    suggested_action: str | None = None,
+) -> dict:
     def url(key: str) -> str | None:
         return storage.signed_url(data[key]) if data.get(key) else None
 
@@ -54,6 +66,8 @@ def design_response(ref_id: str, data: dict, reply: str | None = None, transcrip
         "runway_url": url("runway_path"),
         "reply": reply,
         "transcript": transcript,
+        "messages": data.get("messages", []),
+        "suggested_action": suggested_action or data.get("suggested_action", "none"),
     }
 
 
@@ -63,18 +77,24 @@ def create_design(user: User, msg: MessageIn) -> dict:
 
     ref = db().collection("designs").document()
     path = add_version(ref, 1, image, mime, turn.image_prompt)
+    msgs = [
+        {"role": "user", "text": turn.user_transcript},
+        {"role": "model", "text": turn.reply_to_user},
+    ]
     data = {
         "uid": user.uid,
         "spec": turn.spec.model_dump(),
         "image_prompt": turn.image_prompt,
+        "suggested_action": turn.suggested_action,
         "current_version": 1,
         "current_image_path": path,
+        "messages": msgs,
         "created_at": firestore.SERVER_TIMESTAMP,
         "updated_at": firestore.SERVER_TIMESTAMP,
     }
     ref.set(data)
     save_turn(ref, turn.user_transcript, turn.reply_to_user)
-    return design_response(ref.id, data, turn.reply_to_user, turn.user_transcript)
+    return design_response(ref.id, data, turn.reply_to_user, turn.user_transcript, turn.suggested_action)
 
 
 def continue_design(user: User, design_id: str, msg: MessageIn) -> dict:
@@ -82,7 +102,19 @@ def continue_design(user: User, design_id: str, msg: MessageIn) -> dict:
     spec = DesignSpec.model_validate(data["spec"])
     turn = demo.model("tailor-edit", lambda: tailor.converse(msg, history(ref), spec), TailorTurn)
 
-    updates: dict = {"spec": turn.spec.model_dump(), "updated_at": firestore.SERVER_TIMESTAMP}
+    new_turn = [
+        {"role": "user", "text": turn.user_transcript},
+        {"role": "model", "text": turn.reply_to_user},
+    ]
+    existing_msgs = data.get("messages") or []
+    updated_msgs = existing_msgs + new_turn
+
+    updates: dict = {
+        "spec": turn.spec.model_dump(),
+        "suggested_action": turn.suggested_action,
+        "updated_at": firestore.SERVER_TIMESTAMP,
+        "messages": updated_msgs,
+    }
     if turn.edit_instruction.strip():
         current, mime = storage.download(data["current_image_path"])
         image, out_mime = demo.image("design-edit", lambda: designer.edit(current, mime, turn.edit_instruction))
@@ -96,4 +128,4 @@ def continue_design(user: User, design_id: str, msg: MessageIn) -> dict:
         }
     ref.update(updates)
     save_turn(ref, turn.user_transcript, turn.reply_to_user)
-    return design_response(ref.id, data | updates, turn.reply_to_user, turn.user_transcript)
+    return design_response(ref.id, data | updates, turn.reply_to_user, turn.user_transcript, turn.suggested_action)

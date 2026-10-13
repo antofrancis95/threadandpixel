@@ -19,8 +19,21 @@ export type Design = {
   runway_url: string | null;
   reply: string | null;
   transcript: string | null;
+  suggested_action?: "none" | "fitting" | "measurements" | "runway" | "commission";
   messages?: ChatMessage[];
 };
+
+export type DesignSummary = {
+  design_id: string;
+  version: number;
+  spec: Spec;
+  image_url: string | null;
+  messages_count: number;
+  updated_at: string;
+  created_at: string;
+};
+
+export type AtelierAction = "fitting" | "measurements" | "flats" | "runway" | "commission" | null;
 
 export type ChatMessage = { role: "user" | "model"; text: string; live?: boolean };
 

@@ -1,5 +1,5 @@
 import type { Auth } from "firebase/auth";
-import type { Design, Job, Measurements, OrderDetail, QuoteResponse } from "./types";
+import type { Design, DesignSummary, Job, Measurements, OrderDetail, QuoteResponse } from "./types";
 
 export type MessageInput = { text?: string; audio_b64?: string; audio_mime?: string };
 
@@ -23,6 +23,7 @@ export function createApi(baseUrl: string, auth: Auth) {
 
   return {
     createDesign: (msg: MessageInput) => post<Design>("/designs", msg),
+    listDesigns: () => request<DesignSummary[]>("/designs"),
     getDesign: (id: string) => request<Design>(`/designs/${encodeURIComponent(id)}`),
     sendMessage: (id: string, msg: MessageInput) => post<Design>(`/designs/${encodeURIComponent(id)}/messages`, msg),
     createFlats: (id: string) => post<{ flats_url: string }>(`/designs/${encodeURIComponent(id)}/flats`),

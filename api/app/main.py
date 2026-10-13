@@ -43,6 +43,28 @@ def get_catalog():
     return pricing.catalog()
 
 
+@app.get("/designs")
+def list_designs(user: User = Depends(current_user)):
+    snaps = db().collection("designs").where("uid", "==", user.uid).stream()
+    items = []
+    for s in snaps:
+        d = s.to_dict()
+        def url(key: str) -> str | None:
+            return storage.signed_url(d[key]) if d.get(key) else None
+
+        items.append({
+            "design_id": s.id,
+            "version": d.get("current_version", 1),
+            "spec": d.get("spec", {}),
+            "image_url": url("current_image_path"),
+            "messages_count": len(d.get("messages", [])),
+            "updated_at": str(d.get("updated_at") or d.get("created_at") or ""),
+            "created_at": str(d.get("created_at") or ""),
+        })
+    items.sort(key=lambda x: x["updated_at"] or x["created_at"] or "", reverse=True)
+    return items
+
+
 @app.post("/designs")
 def post_design(body: MessageIn, user: User = Depends(current_user)):
     return create_design(user, body)
@@ -52,7 +74,10 @@ def post_design(body: MessageIn, user: User = Depends(current_user)):
 def get_design(design_id: str, user: User = Depends(current_user)):
     ref, data = owned_design(design_id, user)
     result = design_response(ref.id, data)
-    result["messages"] = history(ref, limit=50)
+    msgs = data.get("messages")
+    if not msgs:
+        msgs = history(ref, limit=50)
+    result["messages"] = msgs
     return result
 
 

@@ -29,6 +29,7 @@ class TailorTurn(BaseModel):
     image_prompt: str
     edit_instruction: str
     reply_to_user: str
+    suggested_action: Literal["none", "fitting", "measurements", "runway", "commission"] = "none"
 
 
 class TechPackCritique(BaseModel):

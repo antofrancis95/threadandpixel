@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { MicIcon, StopIcon } from "./icons";
 
 const ALLOWED = ["audio/webm", "audio/ogg", "audio/mp4", "audio/wav", "audio/mpeg"];
 
@@ -55,7 +56,7 @@ export function MicButton({
       aria-label={recording ? "Stop recording" : "Speak your idea"}
       title={recording ? "Stop recording" : "Speak your idea"}
     >
-      {recording ? "■" : "🎙"}
+      {recording ? <StopIcon size={13} /> : <MicIcon size={16} />}
     </button>
   );
 }

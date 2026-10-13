@@ -184,11 +184,12 @@ export function LiveVoice({
   return (
     <button
       type="button"
-      className={`live-btn ${active ? "on" : ""}`}
+      className={`live-voice-btn ${active ? "active" : ""} ${status === "designing" ? "designing" : ""}`}
       onClick={() => (active ? session.current?.stop() : start())}
-      title="Real-time voice conversation with the AI Tailor (Gemini Live)"
+      title="Real-time voice conversation with the Master Couturier (Gemini Live)"
     >
-      {label}
+      <span className="voice-wave" />
+      <span>{label}</span>
     </button>
   );
 }
