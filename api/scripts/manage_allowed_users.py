@@ -2,6 +2,7 @@
   python scripts/manage_allowed_users.py add <email> [role]
   python scripts/manage_allowed_users.py list
   python scripts/manage_allowed_users.py remove <email>
+  python scripts/manage_allowed_users.py set-password <email> <password>
 """
 
 import sys
@@ -10,8 +11,14 @@ from pathlib import Path
 # Insert parent directory so app packages can be imported
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import firebase_admin
+from firebase_admin import auth as fb_auth
 from google.cloud import firestore
 from app.clients import db
+from app.config import settings
+
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(options={"projectId": settings.project})
 
 
 def add_user(email: str, role: str = "designer"):
@@ -59,6 +66,24 @@ def list_users():
     print("------------------------------------\n")
 
 
+def set_password(email: str, password: str):
+    email = email.strip().lower()
+    if not email or "@" not in email:
+        print(f"Error: Invalid email address: {email}")
+        sys.exit(1)
+    if len(password) < 6:
+        print("Error: Password must be at least 6 characters long.")
+        sys.exit(1)
+
+    try:
+        user = fb_auth.get_user_by_email(email)
+        fb_auth.update_user(user.uid, password=password)
+        print(f"Updated password for Firebase Auth user '{email}' (uid={user.uid}).")
+    except fb_auth.UserNotFoundError:
+        user = fb_auth.create_user(email=email, password=password)
+        print(f"Created new Firebase Auth user '{email}' (uid={user.uid}) with specified password.")
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(__doc__)
@@ -78,6 +103,11 @@ if __name__ == "__main__":
             print("Usage: python scripts/manage_allowed_users.py remove <email>")
             sys.exit(1)
         remove_user(sys.argv[2])
+    elif cmd == "set-password":
+        if len(sys.argv) < 4:
+            print("Usage: python scripts/manage_allowed_users.py set-password <email> <password>")
+            sys.exit(1)
+        set_password(sys.argv[2], sys.argv[3])
     else:
         print(f"Unknown command: {cmd}")
         print(__doc__)

@@ -1,6 +1,12 @@
 "use client";
 
-import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+} from "firebase/auth";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArchiveDrawer } from "@/components/ArchiveDrawer";
@@ -56,6 +62,12 @@ export default function AtelierStudio() {
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [authDeniedReason, setAuthDeniedReason] = useState<string | null>(null);
+
+  // Email / Password Form State
+  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
+  const [emailInput, setEmailInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [authSubmitting, setAuthSubmitting] = useState(false);
 
   // Loading & Consultation History State
   const [initialLoading, setInitialLoading] = useState(true);
@@ -317,6 +329,45 @@ export default function AtelierStudio() {
     setAssetErrors({});
   }
 
+  async function handleEmailAuth(e: React.FormEvent) {
+    e.preventDefault();
+    if (!emailInput.trim() || !passwordInput) {
+      setError("Please enter your email and password.");
+      return;
+    }
+    setError(null);
+    setAuthSubmitting(true);
+    try {
+      if (authMode === "signin") {
+        await signInWithEmailAndPassword(auth, emailInput.trim(), passwordInput);
+      } else {
+        await createUserWithEmailAndPassword(auth, emailInput.trim(), passwordInput);
+      }
+    } catch (err: unknown) {
+      const e = err as { code?: string; message?: string };
+      switch (e.code) {
+        case "auth/user-not-found":
+        case "auth/wrong-password":
+        case "auth/invalid-credential":
+          setError("Incorrect email or password. If you are new to the atelier, switch to 'Create Account'.");
+          break;
+        case "auth/email-already-in-use":
+          setError("An account with this email already exists. Please switch to 'Sign In'.");
+          break;
+        case "auth/weak-password":
+          setError("Password should be at least 6 characters long.");
+          break;
+        case "auth/invalid-email":
+          setError("Please enter a valid email address.");
+          break;
+        default:
+          setError(e.message || "Authentication failed. Please verify your credentials.");
+      }
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
   async function handleGoogleSignIn() {
     setError(null);
     try {
@@ -326,7 +377,13 @@ export default function AtelierStudio() {
     } catch (err: unknown) {
       const e = err as { code?: string; message?: string };
       if (e.code !== "auth/popup-closed-by-user") {
-        setError(e.message || "Failed to sign in with Google.");
+        if (e.code === "auth/unauthorized-domain") {
+          setError(
+            "Google Sign-In: Unauthorized domain. Please sign in with Email & Password above while domain authorization propagates in Firebase.",
+          );
+        } else {
+          setError(e.message || "Failed to sign in with Google.");
+        }
       }
     }
   }
@@ -365,10 +422,80 @@ export default function AtelierStudio() {
             Thread <span>&amp;</span> Pixel
           </h2>
           <p className="atelier-auth-desc">
-            Haute Couture Atelier Studio. Sign in with your authorized Google account to access conversational draping, runway synthesis, and precision technical packs.
+            Haute Couture Atelier Studio. Enter your atelier credentials or sign in with Google to access conversational draping, runway synthesis, and precision technical packs.
           </p>
 
           {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
+
+          {/* Email / Password Form */}
+          <form className="auth-form" onSubmit={handleEmailAuth}>
+            <div className="auth-mode-tabs">
+              <button
+                type="button"
+                className={`auth-mode-tab ${authMode === "signin" ? "active" : ""}`}
+                onClick={() => {
+                  setAuthMode("signin");
+                  setError(null);
+                }}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                className={`auth-mode-tab ${authMode === "signup" ? "active" : ""}`}
+                onClick={() => {
+                  setAuthMode("signup");
+                  setError(null);
+                }}
+              >
+                Create Account
+              </button>
+            </div>
+
+            <div className="auth-field">
+              <label htmlFor="auth-email">Email Address</label>
+              <input
+                id="auth-email"
+                type="email"
+                className="auth-input"
+                placeholder="designer@threadandpixel.com"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                autoComplete="email"
+                required
+              />
+            </div>
+
+            <div className="auth-field">
+              <label htmlFor="auth-password">Password</label>
+              <input
+                id="auth-password"
+                type="password"
+                className="auth-input"
+                placeholder="••••••••"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                autoComplete={authMode === "signin" ? "current-password" : "new-password"}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="auth-submit-btn"
+              disabled={authSubmitting}
+            >
+              {authSubmitting
+                ? "Verifying Atelier Access..."
+                : authMode === "signin"
+                ? "Enter Atelier Studio"
+                : "Create Atelier Account"}
+            </button>
+          </form>
+
+          <div className="auth-divider">
+            <span>or continue with</span>
+          </div>
 
           <button
             type="button"
