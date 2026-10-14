@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ErrorAlert } from "@/components/ErrorAlert";
 import {
   AlertTriangleIcon,
   CheckIcon,
@@ -112,7 +113,7 @@ export function CommissionCard({
         </p>
       </details>
 
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
 
       {orderId ? (
         <div style={{ padding: "0.75rem", background: "var(--emerald-light)", borderRadius: "var(--radius-sm)", color: "var(--emerald)", fontWeight: 600, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.4rem" }}>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArchiveDrawer } from "@/components/ArchiveDrawer";
 import { Chat } from "@/components/Chat";
+import { ErrorAlert } from "@/components/ErrorAlert";
 import {
   AlertTriangleIcon,
   ArchiveIcon,
@@ -60,6 +61,9 @@ export default function AtelierStudio() {
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [tryonBusy, setTryonBusy] = useState(false);
   const [assetErrors, setAssetErrors] = useState<Record<string, boolean>>({});
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [voiceVolume, setVoiceVolume] = useState(0);
+  const [voiceDesigning, setVoiceDesigning] = useState(false);
 
   useEffect(() => {
     api.health().then((h) => setDemoMode(h.demo_mode)).catch(() => {});
@@ -107,6 +111,9 @@ export default function AtelierStudio() {
   }, [ready, user, api]);
 
   function liveTranscript(role: "user" | "model", text: string) {
+    if (role === "user" && text.trim()) {
+      setActiveWidget(null);
+    }
     setMessages((m) => {
       const last = m[m.length - 1];
       if (last?.live && last.role === role) return [...m.slice(0, -1), { ...last, text: last.text + text }];
@@ -120,11 +127,14 @@ export default function AtelierStudio() {
 
   function liveDesign(d: Design) {
     localStorage.setItem(STORAGE_KEY, d.design_id);
+    setVoiceDesigning(false);
     setDesign(d);
     setAssetErrors({});
     setActiveTab("editorial");
     if (d.suggested_action && d.suggested_action !== "none") {
       setActiveWidget(d.suggested_action as AtelierAction);
+    } else {
+      setActiveWidget(null);
     }
     loadArchive();
   }
@@ -132,6 +142,7 @@ export default function AtelierStudio() {
   async function send(msg: MessageInput) {
     setBusy(true);
     setError(null);
+    setActiveWidget(null);
     if (msg.text) setMessages((m) => [...m, { role: "user", text: msg.text! }]);
     try {
       const d = design ? await api.sendMessage(design.design_id, msg) : await api.createDesign(msg);
@@ -146,6 +157,8 @@ export default function AtelierStudio() {
       // Open suggested widget if recommended by the Couturier
       if (d.suggested_action && d.suggested_action !== "none") {
         setActiveWidget(d.suggested_action as AtelierAction);
+      } else {
+        setActiveWidget(null);
       }
       loadArchive();
     } catch (e) {
@@ -182,6 +195,7 @@ export default function AtelierStudio() {
     if (!design) return;
     setBusy(true);
     setError(null);
+    setActiveWidget(null);
     setAssetErrors((e) => ({ ...e, flats: false }));
     try {
       const { flats_url } = await api.createFlats(design.design_id);
@@ -217,7 +231,7 @@ export default function AtelierStudio() {
     try {
       const { upload_id } = await api.uploadPerson(file);
       const { tryon_url } = await api.tryOn(design.design_id, upload_id);
-      setDesign({ ...design, tryon_url, runway_url: null });
+      setDesign({ ...design, tryon_url, runway_url: null, has_vto_portrait: true });
       setActiveTab("tryon");
       setActiveWidget(null);
       setMessages((m) => [
@@ -225,6 +239,30 @@ export default function AtelierStudio() {
         {
           role: "model",
           text: "I have draped this bespoke creation onto your portrait in the salon mirror. You may inspect the fit on the showcase board.",
+        },
+      ]);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setTryonBusy(false);
+    }
+  }
+
+  async function handleDrapeExisting() {
+    if (!design) return;
+    setTryonBusy(true);
+    setError(null);
+    setAssetErrors((e) => ({ ...e, tryon: false }));
+    try {
+      const { tryon_url } = await api.tryOn(design.design_id);
+      setDesign({ ...design, tryon_url, runway_url: null, has_vto_portrait: true });
+      setActiveTab("tryon");
+      setActiveWidget(null);
+      setMessages((m) => [
+        ...m,
+        {
+          role: "model",
+          text: "I have draped this updated silhouette onto your saved portrait in the salon mirror.",
         },
       ]);
     } catch (e) {
@@ -267,8 +305,7 @@ export default function AtelierStudio() {
             <span>Archive{pastDesigns.length > 0 ? ` (${pastDesigns.length})` : ""}</span>
           </button>
           {design && (
-            <button type="button" className="secondary" onClick={startOver}>
-              New Commission
+            <button type="button" className="secondary new-commission-btn" onClick={startOver}>
               <PlusIcon size={13} />
               <span>New Commission</span>
             </button>
@@ -277,7 +314,7 @@ export default function AtelierStudio() {
         </nav>
       </header>
 
-      {error && <p className="error banner">{error}</p>}
+      {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
 
       <main className="studio">
         {initialLoading ? (
@@ -291,7 +328,9 @@ export default function AtelierStudio() {
             </section>
             <section className="panel showcase-panel">
               <div className="panel-head">
-                <h2>Couture Showcase</h2>
+                <h2 className="showcase-title">
+                  <span>Couture Showcase</span>
+                </h2>
               </div>
               <ShowcaseSkeleton />
             </section>
@@ -301,19 +340,47 @@ export default function AtelierStudio() {
         {/* Left Column: Conversational Atelier Stream */}
         <Chat
           messages={messages}
-          busy={busy}
+          busy={busy || voiceDesigning}
           onSend={send}
           hasDesign={Boolean(design)}
           suggestedAction={(design?.suggested_action as AtelierAction) ?? null}
           activeWidget={activeWidget}
           onSelectWidget={setActiveWidget}
+          voiceActive={voiceActive}
+          voiceVolume={voiceVolume}
           headerAction={
             <LiveVoice
               designId={design?.design_id ?? null}
               onTranscript={liveTranscript}
               onTurnComplete={liveTurnComplete}
               onDesign={liveDesign}
-              onError={setError}
+              onError={(err) => {
+                setVoiceDesigning(false);
+                setError(err);
+              }}
+              onUserSpeech={() => {
+                setActiveWidget(null);
+              }}
+              onDesigning={() => {
+                setActiveWidget(null);
+                setVoiceDesigning(true);
+              }}
+              onVoiceActivity={(active, vol) => {
+                setVoiceActive(active);
+                setVoiceVolume(vol);
+              }}
+              onFlats={(flatsUrl) => {
+                setDesign((prev) => (prev ? { ...prev, flats_url: flatsUrl } : null));
+                setActiveTab("flats");
+                setActiveWidget(null);
+              }}
+              onWidget={(widget) => {
+                setActiveWidget(widget);
+              }}
+              onRunwayStarted={() => {
+                setActiveTab("runway");
+                setActiveWidget("runway");
+              }}
             />
           }
           widgetContent={
@@ -326,6 +393,8 @@ export default function AtelierStudio() {
             ) : activeWidget === "fitting" ? (
               <FittingRoomCard
                 onSubmit={handleTryonUpload}
+                onDrapeExisting={handleDrapeExisting}
+                hasExistingPortrait={Boolean(design?.has_vto_portrait || design?.tryon_url)}
                 onClose={() => setActiveWidget(null)}
                 busy={tryonBusy}
               />
@@ -353,7 +422,14 @@ export default function AtelierStudio() {
         {/* Right Column: Couture Showcase & Moodboard */}
         <section className="panel showcase-panel">
           <div className="panel-head">
-            <h2>Couture Showcase {design ? `· v${design.version}` : ""}</h2>
+            <h2 className="showcase-title">
+              <span>Couture Showcase</span>
+              {design && (
+                <span className="version-pill">
+                  {design.version > 0 ? `v${design.version}` : "Consultation"}
+                </span>
+              )}
+            </h2>
             <div className="view-tabs">
               <button
                 type="button"
@@ -370,7 +446,12 @@ export default function AtelierStudio() {
               >
                 <RulerIcon size={12} />
                 <span>Flats</span>
-                {design && !design.flats_url && <span className="tab-pill">draft</span>}
+                {design && design.flats_url && (
+                  <span className="tab-pill" style={{ background: "var(--gold)", color: "white", fontWeight: 600 }}>
+                    with measurements
+                  </span>
+                )}
+                {design && !design.flats_url && design.version > 0 && <span className="tab-pill">draft</span>}
               </button>
               <button
                 type="button"
@@ -395,7 +476,7 @@ export default function AtelierStudio() {
 
           {/* High-Resolution Frame */}
           <div className="canvas-frame">
-            {busy && !design ? (
+            {(busy || voiceDesigning) && (!design || !design.image_url) ? (
               <div className="silk-shimmer-full">
                 <div className="shimmer-aura">
                   <span className="shimmer-icon">
@@ -405,9 +486,9 @@ export default function AtelierStudio() {
                 <h3 className="shimmer-title">Draping Haute Couture Silhouette</h3>
                 <span className="shimmer-subtitle">Weaving bespoke textiles &amp; formulating tailoring specs…</span>
               </div>
-            ) : design ? (
+            ) : design && design.image_url ? (
               <>
-                {busy && (
+                {(busy || voiceDesigning) && (
                   <div className="silk-shimmer-overlay">
                     <span className="spin-silk">
                       <SparkleIcon size={13} />
@@ -512,18 +593,35 @@ export default function AtelierStudio() {
                         <MirrorIcon size={26} />
                       </div>
                       <span className="mannequin-badge">✦ Salon Mirror</span>
-                      <h3 className="asset-empty-title">Virtual Fitting Not Yet Draped</h3>
+                      <h3 className="asset-empty-title">
+                        {design.has_vto_portrait ? "Saved Portrait Ready" : "Virtual Fitting Not Yet Draped"}
+                      </h3>
                       <p className="asset-empty-desc">
-                        Upload your full-length portrait to step into the virtual salon mirror and drape this bespoke creation directly onto your frame.
+                        {design.has_vto_portrait
+                          ? "Your portrait is safely saved in the atelier. Drape this updated piece onto your portrait, or open the fitting room to upload a new one."
+                          : "Upload your full-length portrait to step into the virtual salon mirror and drape this bespoke creation directly onto your frame."}
                       </p>
-                      <button
-                        type="button"
-                        className="primary"
-                        onClick={() => setActiveWidget("fitting")}
-                      >
-                        <MirrorIcon size={14} />
-                        <span>Enter Virtual Fitting Room</span>
-                      </button>
+                      <div style={{ display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
+                        {design.has_vto_portrait && (
+                          <button
+                            type="button"
+                            className="primary"
+                            onClick={handleDrapeExisting}
+                            disabled={tryonBusy}
+                          >
+                            <SparkleIcon size={14} />
+                            <span>{tryonBusy ? "Draping on You…" : "Drape on Saved Portrait"}</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className={design.has_vto_portrait ? "secondary" : "primary"}
+                          onClick={() => setActiveWidget("fitting")}
+                        >
+                          <MirrorIcon size={14} />
+                          <span>{design.has_vto_portrait ? "Re-upload Portrait" : "Enter Virtual Fitting Room"}</span>
+                        </button>
+                      </div>
                     </div>
                   )
                 ) : activeTab === "runway" ? (
@@ -568,7 +666,7 @@ export default function AtelierStudio() {
             ) : (
               <div className="canvas-placeholder">
                 <span className="mannequin-badge">
-                  <SparkleIcon size={10} /> Bespoke Canvas
+                  <SparkleIcon size={10} /> {design && design.version === 0 ? "✦ Consultation in Progress" : "Bespoke Canvas"}
                 </span>
                 <div className="mannequin-silhouette">
                   <MannequinIcon size={34} />
@@ -576,21 +674,38 @@ export default function AtelierStudio() {
                 <strong style={{ fontFamily: "var(--font-serif)", fontSize: "1.15rem", color: "var(--ink)" }}>
                   The Atelier Mannequin
                 </strong>
-                <p style={{ margin: 0, fontSize: "0.82rem", maxWidth: "280px", color: "var(--muted)", lineHeight: 1.5 }}>
-                  Your bespoke design will be draped here as you speak or describe your silhouette to the Couturier.
+                <p style={{ margin: 0, fontSize: "0.82rem", maxWidth: "320px", color: "var(--muted)", lineHeight: 1.5 }}>
+                  {design && design.version === 0
+                    ? "Consulting on your bespoke color, fit, fabric, and size. Draping will commence as soon as specifications are chosen."
+                    : "Your bespoke design will be draped here as you speak or describe your silhouette to the Couturier."}
                 </p>
               </div>
             )}
           </div>
 
           {/* Garment Details & Spec Ribbon */}
-          {design && (
+          {design && design.version > 0 && (
             <>
               <div className="spec-ribbon">
                 <span className="spec-chip">
                   <span className="swatch-circle" style={{ background: design.spec.color_hex }} />
                   {design.spec.color_hex}
                 </span>
+                {design.spec.gender && (
+                  <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 600 }}>
+                    {design.spec.gender === "menswear" ? "👔 Menswear" : "👗 Womenswear"}
+                  </span>
+                )}
+                {design.spec.size && (
+                  <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 700 }}>
+                    Size {design.spec.size}
+                  </span>
+                )}
+                {design.spec.fit && (
+                  <span className="spec-chip">
+                    {design.spec.fit}
+                  </span>
+                )}
                 <span className="spec-chip">{design.spec.garment_type}</span>
                 <span className="spec-chip">{design.spec.length}</span>
                 <span className="spec-chip">{design.spec.sleeve.replace("_", " ")} sleeve</span>

@@ -14,7 +14,17 @@ from .auth import User, current_user
 from .clients import db
 from .config import settings
 from .models import DesignSpec, MessageIn, OrderIn, PhotoCheck, TechPackCritique, TechPackIn, TryOnIn
-from .service import EXT, continue_design, create_design, design_response, history, owned_design
+from .service import (
+    EXT,
+    continue_design,
+    create_design,
+    design_response,
+    generate_flats_service,
+    history,
+    job_response,
+    owned_design,
+    start_runway_service,
+)
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
@@ -22,8 +32,9 @@ app = FastAPI(title="Thread & Pixel API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 app.include_router(live.router)
 
@@ -88,15 +99,7 @@ def post_message(design_id: str, body: MessageIn, user: User = Depends(current_u
 
 @app.post("/designs/{design_id}/flats")
 def create_flats(design_id: str, user: User = Depends(current_user)):
-    ref, data = owned_design(design_id, user)
-    current, mime = storage.download(data["current_image_path"])
-    spec = DesignSpec.model_validate(data["spec"])
-    image, out_mime = demo.image("flats", lambda: designer.technical_flats(current, mime, spec))
-    path = storage.upload(
-        f"designs/{ref.id}/flats-v{data['current_version']}.{EXT.get(out_mime, 'png')}", image, out_mime
-    )
-    ref.update({"flats_path": path})
-    return {"flats_url": storage.signed_url(path)}
+    return generate_flats_service(user, design_id)
 
 
 @app.post("/uploads/person")
@@ -133,60 +136,55 @@ async def upload_person(
     db().collection("uploads").document(upload_id).set(
         {"uid": user.uid, "path": path, "consent_at": firestore.SERVER_TIMESTAMP}
     )
+    db().collection("users").document(user.uid).set(
+        {"last_upload_id": upload_id, "last_person_path": path},
+        merge=True,
+    )
     return {"upload_id": upload_id}
 
 
 @app.post("/designs/{design_id}/tryon")
 def create_tryon(design_id: str, body: TryOnIn, user: User = Depends(current_user)):
     ref, data = owned_design(design_id, user)
-    snap = db().collection("uploads").document(body.upload_id).get()
-    if not snap.exists or snap.get("uid") != user.uid:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Upload not found")
+    upload_id = body.upload_id or data.get("person_upload_id")
+    person_path = None
 
-    person, person_mime = storage.download(snap.get("path"))
+    if body.upload_id:
+        snap = db().collection("uploads").document(body.upload_id).get()
+        if not snap.exists or snap.get("uid") != user.uid:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Upload not found")
+        person_path = snap.get("path")
+        upload_id = body.upload_id
+    elif data.get("person_upload_path"):
+        person_path = data.get("person_upload_path")
+        upload_id = data.get("person_upload_id")
+    else:
+        u_snap = db().collection("users").document(user.uid).get()
+        if u_snap.exists and u_snap.get("last_person_path"):
+            person_path = u_snap.get("last_person_path")
+            upload_id = u_snap.get("last_upload_id")
+        else:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "No portrait uploaded yet. Please upload a photo for virtual try-on.",
+            )
+
+    person, person_mime = storage.download(person_path)
     garment, garment_mime = storage.download(data["current_image_path"])
     result = demo.blob("tryon", lambda: tryon.try_on(person, person_mime, garment, garment_mime), "image/jpeg")
     path = storage.upload(f"uploads/{user.uid}/tryon-{ref.id}-v{data['current_version']}.jpg", result, "image/jpeg")
-    ref.update({"tryon_path": path, "runway_path": None})
-    return {"tryon_url": storage.signed_url(path)}
+    ref.update({
+        "tryon_path": path,
+        "person_upload_path": person_path,
+        "person_upload_id": upload_id,
+        "runway_path": None,
+    })
+    return {"tryon_url": storage.signed_url(path), "has_vto_portrait": True}
 
 
 @app.post("/designs/{design_id}/runway")
 def create_runway(design_id: str, user: User = Depends(current_user)):
-    ref, data = owned_design(design_id, user)
-    job_ref = db().collection("jobs").document()
-    job = {
-        "uid": user.uid,
-        "type": "runway",
-        "design_id": ref.id,
-        "version": data["current_version"],
-        "status": "running",
-        "operation": None,
-        "video_path": None,
-        "error": None,
-        "created_at": firestore.SERVER_TIMESTAMP,
-    }
-
-    cached = demo.cached_video() if settings.demo_mode in ("replay", "fallback") else None
-    if settings.demo_mode == "replay" and cached:
-        job |= {"status": "done", "video_path": cached}
-    else:
-        try:
-            if data.get("tryon_path"):
-                frame, frame_mime = storage.download(data["tryon_path"])
-            else:
-                garment, garment_mime = storage.download(data["current_image_path"])
-                frame, frame_mime = demo.image("runway-still", lambda: runway.runway_still(garment, garment_mime))
-            job["operation"] = runway.start(frame, frame_mime, f"uploads/{user.uid}/runway/{ref.id}/{job_ref.id}/")
-        except Exception:
-            if not cached:
-                raise
-            job |= {"status": "done", "video_path": cached}
-
-    job_ref.set(job)
-    if job["video_path"]:
-        ref.update({"runway_path": job["video_path"]})
-    return _job_response(job_ref.id, job)
+    return start_runway_service(user, design_id)
 
 
 @app.get("/jobs/{job_id}")

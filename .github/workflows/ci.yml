@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'api/**'
+      - 'web/**'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-tests:
+    name: API Unit Tests (FastAPI)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: api/requirements.txt
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r api/requirements.txt pytest
+
+      - name: Run Pytest
+        working-directory: api
+        run: |
+          PYTHONPATH=. pytest tests -v
+
+  web-checks:
+    name: Web Typecheck & Build (Next.js)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Run Typecheck
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Validate Production Build
+        working-directory: web
+        env:
+          API_URL: http://localhost:8080
+          FIREBASE_CONFIG: '{"apiKey":"ci-test","authDomain":"ci.firebaseapp.com","projectId":"datavision-482713","appId":"ci-app"}'
+        run: npm run build

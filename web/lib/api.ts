@@ -1,7 +1,12 @@
 import type { Auth } from "firebase/auth";
 import type { Design, DesignSummary, Job, Measurements, OrderDetail, QuoteResponse } from "./types";
 
-export type MessageInput = { text?: string; audio_b64?: string; audio_mime?: string };
+export type MessageInput = {
+  text?: string;
+  audio_b64?: string;
+  audio_mime?: string;
+  gender?: "womenswear" | "menswear" | "unisex";
+};
 
 export function createApi(baseUrl: string, auth: Auth) {
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -33,8 +38,11 @@ export function createApi(baseUrl: string, auth: Auth) {
       form.append("consent", "true");
       return request<{ upload_id: string }>("/uploads/person", { method: "POST", body: form });
     },
-    tryOn: (id: string, uploadId: string) =>
-      post<{ tryon_url: string }>(`/designs/${encodeURIComponent(id)}/tryon`, { upload_id: uploadId }),
+    tryOn: (id: string, uploadId?: string | null) =>
+      post<{ tryon_url: string }>(
+        `/designs/${encodeURIComponent(id)}/tryon`,
+        uploadId ? { upload_id: uploadId } : {}
+      ),
     techpack: (id: string, size: string, measurements?: Measurements) =>
       post<QuoteResponse>(`/designs/${encodeURIComponent(id)}/techpack`, { size, measurements }),
     order: (id: string, quoteId: string) =>

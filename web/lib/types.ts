@@ -7,19 +7,23 @@ export type Spec = {
   closures: string[];
   embellishments: string[];
   lining: boolean;
+  gender?: "womenswear" | "menswear" | "unisex";
+  size?: "XS" | "S" | "M" | "L" | "XL" | "XXL";
+  fit?: string;
 };
 
 export type Design = {
   design_id: string;
   version: number;
   spec: Spec;
-  image_url: string;
+  image_url: string | null;
   flats_url: string | null;
   tryon_url: string | null;
   runway_url: string | null;
+  has_vto_portrait?: boolean;
   reply: string | null;
   transcript: string | null;
-  suggested_action?: "none" | "fitting" | "measurements" | "runway" | "commission";
+  suggested_action?: "none" | "fitting" | "measurements" | "runway" | "commission" | "gender" | "consultation";
   messages?: ChatMessage[];
 };
 
@@ -33,7 +37,7 @@ export type DesignSummary = {
   created_at: string;
 };
 
-export type AtelierAction = "fitting" | "measurements" | "flats" | "runway" | "commission" | null;
+export type AtelierAction = "fitting" | "measurements" | "flats" | "runway" | "commission" | "gender" | "consultation" | null;
 
 export type ChatMessage = { role: "user" | "model"; text: string; live?: boolean };
 

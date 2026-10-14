@@ -41,11 +41,12 @@ BASE_YARDS: dict[str, dict[str, float]] = {
     "trousers": dict(zip(_L, (1.2, 1.4, 1.8, 2.2, 2.6, 2.8))),
     "jacket":   dict(zip(_L, (1.8, 2.2, 2.8, 3.2, 3.6, 3.8))),
     "jumpsuit": dict(zip(_L, (2.2, 2.6, 3.0, 3.4, 3.8, 4.0))),
+    "suit":     dict(zip(_L, (3.0, 3.6, 4.4, 5.0, 5.8, 6.2))),
 }
 SLEEVE_YARDS = {"sleeveless": 0.0, "cap": 0.1, "short": 0.25, "three_quarter": 0.45, "long": 0.6}
 SIZE_MULT: dict[str, float] = {"XS": 0.90, "S": 0.95, "M": 1.00, "L": 1.08, "XL": 1.16, "XXL": 1.25}
 
-BASE_HOURS = {"dress": 4.0, "top": 2.0, "shirt": 3.0, "skirt": 2.0, "trousers": 3.0, "jacket": 6.0, "jumpsuit": 5.0}
+BASE_HOURS = {"dress": 4.0, "top": 2.0, "shirt": 3.0, "skirt": 2.0, "trousers": 3.0, "jacket": 6.0, "jumpsuit": 5.0, "suit": 8.0}
 CLOSURE_HOURS = {"zipper": 0.5, "buttons": 0.8, "hooks": 0.3, "tie": 0.2, "none": 0.0}
 CLOSURE_TRIM = {"zipper": 3.0, "buttons": 4.0, "hooks": 1.5, "tie": 0.0, "none": 0.0}
 EMBELLISH_HOURS = {"embroidery": 3.0, "lace": 1.5, "beading": 4.0, "pleats": 1.5, "ruffles": 1.5, "print": 0.5}

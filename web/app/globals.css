@@ -705,21 +705,96 @@ button.mic.recording {
 /* Chat Composer */
 .composer-atelier {
   display: flex;
-  gap: 0.6rem;
-  align-items: center;
   gap: 0.65rem;
+  align-items: center;
   padding-top: 0.85rem;
   border-top: 1px solid var(--line-light);
   flex-shrink: 0;
+  transition: all 0.25s ease;
+}
+
+/* Voice-Reactive Visualizer Ribbon above Composer */
+.voice-spectrum-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.42rem 0.95rem;
+  margin-top: 0.4rem;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, rgba(247, 243, 236, 0.96) 0%, rgba(254, 252, 249, 0.98) 50%, rgba(247, 243, 236, 0.96) 100%);
+  border: 1px solid rgba(197, 168, 128, 0.45);
+  box-shadow: 
+    0 2px 8px rgba(197, 168, 128, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  animation: fadeSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.voice-spectrum-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--gold-dark);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.voice-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 6px var(--gold);
+  animation: voicePulse 1.2s infinite ease-in-out;
+}
+
+@keyframes voicePulse {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.7;
+    box-shadow: 0 0 4px rgba(197, 168, 128, 0.5);
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+    box-shadow: 0 0 10px rgba(197, 168, 128, 0.95);
+  }
+}
+
+.voice-spectrum-bars {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 0.5rem;
+}
+
+.voice-bar {
+  display: inline-block;
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
+  transform-origin: center;
+  transition: transform 0.07s ease, opacity 0.12s ease;
+}
+
+.voice-spectrum-hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-style: italic;
+  white-space: nowrap;
 }
 
 .composer-atelier input {
   flex: 1;
-  padding: 0.75rem 1.1rem;
   height: 44px;
   padding: 0 1.25rem;
   border-radius: var(--radius-full);
-  background: var(--surface);
   background: #FFFFFF;
   border: 1px solid var(--line);
   font-size: 0.88rem;
@@ -736,6 +811,16 @@ button.mic.recording {
   box-shadow: 
     0 0 0 3px rgba(197, 168, 128, 0.18),
     inset 0 1px 2px rgba(35, 25, 15, 0.03);
+}
+
+/* Subtle reactive animation responding to user speaking */
+.composer-atelier.voice-active input {
+  border-color: rgba(197, 168, 128, 0.65);
+  background: #FFFEFA;
+  box-shadow: 
+    0 0 calc(6px + var(--voice-vol, 0) * 16px) rgba(197, 168, 128, calc(0.22 + var(--voice-vol, 0) * 0.45)),
+    inset 0 1px 2px rgba(35, 25, 15, 0.04);
+  transition: box-shadow 0.08s ease, border-color 0.2s ease;
 }
 
 .composer-atelier button.primary {
@@ -826,38 +911,77 @@ button.mic.recording {
   top: auto;
 }
 
-.view-tabs {
+.showcase-panel .panel-head {
   display: flex;
-  gap: 0.35rem;
-  background: var(--ivory);
-  padding: 0.25rem;
-  gap: 0.3rem;
-  background: linear-gradient(180deg, #F3EDE3 0%, #EAE1D3 100%);
-  padding: 0.26rem;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line-light);
+  padding-bottom: 0.75rem;
+  flex-shrink: 0;
+}
+
+.showcase-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.version-pill {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.12rem 0.42rem;
   border-radius: var(--radius-full);
-  border: 1px solid var(--line-light);
+  background: var(--gold-light);
+  color: var(--gold-dark);
+  border: 1px solid rgba(197, 168, 128, 0.4);
+}
+
+.view-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: linear-gradient(180deg, #F3EDE3 0%, #EAE1D3 100%);
+  padding: 0.22rem 0.28rem;
+  border-radius: var(--radius-full);
   border: 1px solid var(--line);
   box-shadow: inset 0 1px 3px rgba(35, 25, 15, 0.06);
+  flex-shrink: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.view-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .view-tab {
-  flex: 1;
-  padding: 0.4rem 0.65rem;
-  padding: 0.42rem 0.72rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 0.35rem 0.62rem;
   border-radius: var(--radius-full);
-  border: none;
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-  transition: all 0.2s ease;
+  gap: 0.32rem;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
+  line-height: 1;
 }
 
 .view-tab:hover:not(:disabled) {
@@ -865,11 +989,9 @@ button.mic.recording {
 }
 
 .view-tab.active {
-  background: var(--surface);
   background: linear-gradient(180deg, #FFFFFF 0%, #FAF8F4 100%);
   color: var(--ink);
   font-weight: 600;
-  box-shadow: var(--shadow-subtle);
   border-color: rgba(197, 168, 128, 0.35);
   box-shadow: 
     0 2px 6px -1px rgba(35, 25, 15, 0.1),
@@ -878,15 +1000,18 @@ button.mic.recording {
 }
 
 .tab-pill {
-  font-size: 0.62rem;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.1rem 0.38rem;
+  letter-spacing: 0.06em;
+  padding: 0.12rem 0.38rem;
   border-radius: var(--radius-full);
   background: var(--cream);
   color: var(--muted);
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1;
 }
 
 .view-tab.active .tab-pill {
@@ -1167,22 +1292,23 @@ button.mic.recording {
 
 /* Quick Action Bar under Showcase */
 .showcase-actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   flex-shrink: 0;
 }
 
 .showcase-action-btn {
+  flex: 1 1 calc(20% - 0.5rem);
+  min-width: 108px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.72rem 0.95rem;
-  font-size: 0.82rem;
+  gap: 0.45rem;
+  padding: 0.65rem 0.8rem;
+  font-size: 0.8rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
-  background: var(--surface);
   background: linear-gradient(180deg, #FFFFFF 0%, #FBF8F4 100%);
   text-align: center;
   font-weight: 500;
@@ -1193,6 +1319,7 @@ button.mic.recording {
     inset 0 1px 0 rgba(255, 255, 255, 0.95);
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .showcase-action-btn:hover:not(:disabled) {
@@ -1371,6 +1498,84 @@ button.mic.recording {
   border: 1px solid #F8D7DA;
   color: #B3261E;
   margin: 0.75rem 2rem 0;
+}
+
+/* Auto-Closing & Dismissable Error Banner */
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.75rem 2rem 0;
+  padding: 0.72rem 1.1rem;
+  border-radius: var(--radius-md);
+  background: #FDF2F2;
+  border: 1px solid #F8D7DA;
+  color: #B3261E;
+  font-size: 0.85rem;
+  position: relative;
+  overflow: hidden;
+  animation: fadeSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-shadow: 0 4px 12px rgba(179, 38, 30, 0.08);
+  flex-shrink: 0;
+}
+
+.error-banner-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.error-banner-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #B3261E;
+}
+
+.error-banner-text {
+  font-weight: 500;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.error-banner-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: rgba(179, 38, 30, 0.08);
+  color: #B3261E;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.error-banner-close:hover {
+  background: rgba(179, 38, 30, 0.18);
+  transform: scale(1.08);
+}
+
+.error-banner-timer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: rgba(179, 38, 30, 0.35);
+  width: 100%;
+  transform-origin: left;
+  animation: errorTimerProgress linear forwards;
+}
+
+@keyframes errorTimerProgress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
 }
 
 /* Keyframe Animations */

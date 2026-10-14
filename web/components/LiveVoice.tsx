@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/lib/providers";
-import type { Design } from "@/lib/types";
+import type { AtelierAction, Design } from "@/lib/types";
 
 // Captures mic audio as 16 kHz mono PCM16 in ~100 ms chunks.
 const CAPTURE_WORKLET = `
@@ -38,7 +38,11 @@ type ServerEvent =
   | { type: "ready" | "turn_complete" | "interrupted" }
   | { type: "transcript"; role: "user" | "model"; text: string }
   | { type: "designing"; request: string }
+  | { type: "tool_start"; tool: string; request?: string }
   | { type: "design"; design: Design }
+  | { type: "flats"; flats_url: string }
+  | { type: "widget"; widget: AtelierAction }
+  | { type: "runway_started"; job: any }
   | { type: "error"; message: string };
 
 export function LiveVoice({
@@ -47,18 +51,52 @@ export function LiveVoice({
   onTurnComplete,
   onDesign,
   onError,
+  onVoiceActivity,
+  onFlats,
+  onWidget,
+  onRunwayStarted,
+  onDesigning,
+  onUserSpeech,
 }: {
   designId: string | null;
   onTranscript: (role: "user" | "model", text: string) => void;
   onTurnComplete: () => void;
   onDesign: (design: Design) => void;
   onError: (message: string) => void;
+  onVoiceActivity?: (active: boolean, volume: number) => void;
+  onFlats?: (flatsUrl: string) => void;
+  onWidget?: (widget: AtelierAction) => void;
+  onRunwayStarted?: (job: any) => void;
+  onDesigning?: () => void;
+  onUserSpeech?: () => void;
 }) {
   const { auth, api } = useApp();
   const [status, setStatus] = useState<Status>("idle");
   const session = useRef<{ stop: () => void } | null>(null);
-  const handlers = useRef({ onTranscript, onTurnComplete, onDesign, onError });
-  handlers.current = { onTranscript, onTurnComplete, onDesign, onError };
+  const handlers = useRef({
+    onTranscript,
+    onTurnComplete,
+    onDesign,
+    onError,
+    onVoiceActivity,
+    onFlats,
+    onWidget,
+    onRunwayStarted,
+    onDesigning,
+    onUserSpeech,
+  });
+  handlers.current = {
+    onTranscript,
+    onTurnComplete,
+    onDesign,
+    onError,
+    onVoiceActivity,
+    onFlats,
+    onWidget,
+    onRunwayStarted,
+    onDesigning,
+    onUserSpeech,
+  };
 
   useEffect(() => () => session.current?.stop(), []);
 
@@ -79,6 +117,7 @@ export function LiveVoice({
     let capture: AudioContext | null = null;
     let stream: MediaStream | null = null;
     let stopped = false;
+    let animFrame: number | null = null;
 
     const stopPlayback = () => {
       playing.forEach((s) => s.stop());
@@ -89,6 +128,8 @@ export function LiveVoice({
     const stop = () => {
       if (stopped) return;
       stopped = true;
+      if (animFrame !== null) cancelAnimationFrame(animFrame);
+      handlers.current.onVoiceActivity?.(false, 0);
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "stop" }));
       ws.close();
       stream?.getTracks().forEach((t) => t.stop());
@@ -125,7 +166,27 @@ export function LiveVoice({
       URL.revokeObjectURL(url);
       const node = new AudioWorkletNode(capture, "pcm-capture");
       node.port.onmessage = (e) => ws.readyState === WebSocket.OPEN && ws.send(e.data as ArrayBuffer);
-      capture.createMediaStreamSource(stream).connect(node);
+
+      // Volume analysis for subtle voice-reactive bottom bar animation
+      const analyser = capture.createAnalyser();
+      analyser.fftSize = 64;
+      analyser.smoothingTimeConstant = 0.45;
+      const source = capture.createMediaStreamSource(stream);
+      source.connect(node);
+      source.connect(analyser);
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const checkVolume = () => {
+        if (stopped) return;
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const avg = sum / dataArray.length;
+        const vol = Math.min(1, Math.max(0, (avg - 8) / 55));
+        handlers.current.onVoiceActivity?.(true, vol);
+        animFrame = requestAnimationFrame(checkVolume);
+      };
+      animFrame = requestAnimationFrame(checkVolume);
     };
 
     ws.onopen = () => ws.send(JSON.stringify({ type: "start", token, design_id: designId }));
@@ -149,6 +210,9 @@ export function LiveVoice({
           }
           break;
         case "transcript":
+          if (msg.role === "user" && msg.text.trim()) {
+            handlers.current.onUserSpeech?.();
+          }
           handlers.current.onTranscript(msg.role, msg.text);
           break;
         case "turn_complete":
@@ -157,11 +221,30 @@ export function LiveVoice({
         case "interrupted":
           stopPlayback();
           break;
+        case "tool_start":
+          if (msg.tool === "update_design") {
+            setStatus("designing");
+            handlers.current.onDesigning?.();
+          }
+          break;
         case "designing":
           setStatus("designing");
+          handlers.current.onDesigning?.();
           break;
         case "design":
           handlers.current.onDesign(msg.design);
+          setStatus("listening");
+          break;
+        case "flats":
+          handlers.current.onFlats?.(msg.flats_url);
+          setStatus("listening");
+          break;
+        case "widget":
+          handlers.current.onWidget?.(msg.widget);
+          setStatus("listening");
+          break;
+        case "runway_started":
+          handlers.current.onRunwayStarted?.(msg.job);
           setStatus("listening");
           break;
         case "error":

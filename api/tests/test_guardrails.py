@@ -58,6 +58,67 @@ def test_output_guardrail_assigns_suggested_action():
         suggested_action="none",
     )
     guarded = apply_output_guardrail(turn)
-    # When edit_instruction is present, automatically suggests virtual fitting room!
+    # When edit_instruction is present without existing portrait, suggests virtual fitting room!
     assert guarded.suggested_action == "fitting"
+
+    # When portrait is already on file, guardrail preserves "none" and does not prompt to upload again
+    guarded_with_vto = apply_output_guardrail(turn, has_vto=True)
+    assert guarded_with_vto.suggested_action == "none"
+
+
+def test_consultation_action_when_not_ready_to_sketch():
+    turn = TailorTurn(
+        user_transcript="I'm looking for a polo",
+        spec=DesignSpec(
+            garment_type="shirt",
+            length="hip",
+            sleeve="short",
+            fabric_id="cotton-jersey",
+            color_hex="#1B2A4A",
+            closures=["buttons"],
+            embellishments=[],
+            lining=False,
+            gender="menswear",
+        ),
+        image_prompt="",
+        edit_instruction="",
+        reply_to_user="A bespoke polo is a wonderful choice. What color, fit, fabric, and size would you prefer?",
+        suggested_action="none",
+        ready_to_sketch=False,
+    )
+    guarded = apply_output_guardrail(turn)
+    assert guarded.suggested_action == "consultation"
+    assert guarded.ready_to_sketch is False
+
+
+def test_spec_size_validation():
+    spec = DesignSpec(
+        garment_type="shirt",
+        length="hip",
+        sleeve="short",
+        fabric_id="pique-cotton-custom",
+        color_hex="#1B2A4A",
+        closures=["buttons"],
+        embellishments=[],
+        lining=False,
+        size="L",
+        fit="slim fit",
+    )
+    validated = validate_spec_guardrail(spec)
+    assert validated.size == "L"
+    assert validated.fabric_id == "cotton-jersey"
+
+
+def test_size_measurements_catalog():
+    from app.ai.designer import SIZE_MEASUREMENTS
+
+    assert "shirt" in SIZE_MEASUREMENTS
+    assert "top" in SIZE_MEASUREMENTS
+    assert "dress" in SIZE_MEASUREMENTS
+    assert "suit" in SIZE_MEASUREMENTS
+    for size in ("XS", "S", "M", "L", "XL", "XXL"):
+        assert size in SIZE_MEASUREMENTS["shirt"]
+        assert "Chest Width" in SIZE_MEASUREMENTS["shirt"][size]
+        assert "Body Length" in SIZE_MEASUREMENTS["shirt"][size]
+
 

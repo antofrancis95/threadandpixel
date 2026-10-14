@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { CameraIcon, CheckIcon, CloseIcon, MirrorIcon } from "@/components/icons";
+import { CameraIcon, CheckIcon, CloseIcon, MirrorIcon, SparkleIcon } from "@/components/icons";
 
 export function FittingRoomCard({
   onSubmit,
+  onDrapeExisting,
+  hasExistingPortrait = false,
   onClose,
   busy = false,
 }: {
   onSubmit: (file: File) => void;
+  onDrapeExisting?: () => void;
+  hasExistingPortrait?: boolean;
   onClose?: () => void;
   busy?: boolean;
 }) {
@@ -42,8 +46,50 @@ export function FittingRoomCard({
         )}
       </div>
 
+      {hasExistingPortrait && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "0.75rem 0.9rem",
+            background: "var(--ivory)",
+            border: "1px solid var(--gold-light)",
+            borderRadius: "var(--radius-md)",
+            marginBottom: "0.85rem",
+            gap: "0.75rem",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
+            <SparkleIcon size={16} style={{ color: "var(--gold)" }} />
+            <div>
+              <strong style={{ fontSize: "0.84rem", display: "block", color: "var(--ink)" }}>
+                Saved Fitting Portrait Active
+              </strong>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                Your portrait is preserved on file. Drape this updated piece directly onto it.
+              </span>
+            </div>
+          </div>
+          {onDrapeExisting && (
+            <button
+              type="button"
+              className="primary"
+              onClick={onDrapeExisting}
+              disabled={busy}
+              style={{ fontSize: "0.8rem", padding: "0.45rem 0.85rem", whiteSpace: "nowrap" }}
+            >
+              {busy ? "Draping…" : "Drape on Saved Portrait"}
+            </button>
+          )}
+        </div>
+      )}
+
       <p style={{ fontSize: "0.82rem", color: "var(--muted)", margin: "0 0 0.75rem" }}>
-        Upload a full-length, front-facing portrait to drape this garment directly onto yourself:
+        {hasExistingPortrait
+          ? "Or upload a different portrait to replace your saved fitting photo:"
+          : "Upload a full-length, front-facing portrait to drape this garment directly onto yourself:"}
       </p>
 
       <div className="dropzone-atelier">

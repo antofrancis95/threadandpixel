@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ErrorAlert } from "@/components/ErrorAlert";
 import { CloseIcon, FilmIcon, SparkleIcon } from "@/components/icons";
 import { useApp } from "@/lib/providers";
 
@@ -68,7 +69,7 @@ export function RunwayCard({
         Generate an 8-second cinematic Veo motion clip of a model walking the Paris runway in this exact piece.
       </p>
 
-      {error && <p className="error">{error}</p>}
+      {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
 
       {runwayUrl ? (
         <div style={{ borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid var(--line)" }}>

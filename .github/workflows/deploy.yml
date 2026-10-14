@@ -1,0 +1,200 @@
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'api/**'
+      - 'web/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Component to deploy'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - api
+          - web
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-cloudrun-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci-check:
+    name: Run CI Pre-checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: api/requirements.txt
+
+      - name: Install Python Dependencies & Test
+        run: |
+          pip install -r api/requirements.txt pytest
+          cd api && PYTHONPATH=. pytest tests -v
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install Web Dependencies & Typecheck
+        run: |
+          cd web
+          npm ci
+          npm run typecheck
+
+  deploy:
+    name: Deploy to Cloud Run
+    needs: [ci-check]
+    runs-on: ubuntu-latest
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID || 'datavision-482713' }}
+      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      RUNTIME_SA: ${{ vars.RUNTIME_SA || 'tp-runtime@datavision-482713.iam.gserviceaccount.com' }}
+      ASSET_BUCKET: ${{ vars.ASSET_BUCKET || 'tp-assets-datavision-482713' }}
+      MIN_INSTANCES: ${{ vars.MIN_INSTANCES || '1' }}
+      TARGET: ${{ github.event.inputs.target || 'all' }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud (Workload Identity)
+        if: ${{ secrets.WIF_PROVIDER != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Authenticate to Google Cloud (Key Fallback)
+        if: ${{ secrets.WIF_PROVIDER == '' && secrets.GCP_SA_KEY != '' }}
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # -------------------------------------------------------------
+      # 1. DEPLOY API (tp-api)
+      # -------------------------------------------------------------
+      - name: Deploy tp-api (FastAPI)
+        id: deploy-api
+        if: ${{ env.TARGET == 'all' || env.TARGET == 'api' }}
+        run: |
+          echo "==> Deploying tp-api..."
+          ENV_VARS="GOOGLE_CLOUD_PROJECT=${PROJECT_ID}"
+          ENV_VARS="${ENV_VARS},GOOGLE_CLOUD_REGION=${REGION}"
+          ENV_VARS="${ENV_VARS},ASSET_BUCKET=${ASSET_BUCKET}"
+          ENV_VARS="${ENV_VARS},GEMINI_LOCATION=${{ vars.GEMINI_LOCATION || 'global' }}"
+          ENV_VARS="${ENV_VARS},LIVE_LOCATION=${{ vars.LIVE_LOCATION || 'us-central1' }}"
+          ENV_VARS="${ENV_VARS},MODEL_FLASH=${{ vars.MODEL_FLASH || 'gemini-3.8-flash' }}"
+          ENV_VARS="${ENV_VARS},MODEL_LITE=${{ vars.MODEL_LITE || 'gemini-3.5-flash-lite' }}"
+          ENV_VARS="${ENV_VARS},MODEL_PRO=${{ vars.MODEL_PRO || 'gemini-3.1-pro-preview' }}"
+          ENV_VARS="${ENV_VARS},MODEL_IMAGE=${{ vars.MODEL_IMAGE || 'gemini-nano-banana-2.1' }}"
+          ENV_VARS="${ENV_VARS},MODEL_VTO=${{ vars.MODEL_VTO || 'virtual-try-on-001' }}"
+          ENV_VARS="${ENV_VARS},MODEL_VIDEO=${{ vars.MODEL_VIDEO || 'veo-3.1-fast-generate-001' }}"
+          ENV_VARS="${ENV_VARS},MODEL_LIVE=${{ vars.MODEL_LIVE || 'gemini-3.8-live' }}"
+          ENV_VARS="${ENV_VARS},DEMO_MODE=${{ vars.DEMO_MODE || 'off' }}"
+          ENV_VARS="${ENV_VARS},DEMO_TIMEOUT_S=${{ vars.DEMO_TIMEOUT_S || '25' }}"
+          ENV_VARS="${ENV_VARS},ALLOWED_ORIGINS=http://localhost:3000"
+
+          gcloud run deploy tp-api \
+            --source ./api \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --service-account "${RUNTIME_SA}" \
+            --allow-unauthenticated \
+            --memory 1Gi \
+            --timeout 3600 \
+            --min-instances "${MIN_INSTANCES}" \
+            --set-env-vars "${ENV_VARS}"
+
+          API_URL=$(gcloud run services describe tp-api --project "${PROJECT_ID}" --region "${REGION}" --format="value(status.url)")
+          echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
+          echo "Deployed API at: ${API_URL}"
+
+      # -------------------------------------------------------------
+      # 2. RESOLVE API URL FOR WEB (if only web is deploying)
+      # -------------------------------------------------------------
+      - name: Fetch Live API URL
+        id: get-api-url
+        if: ${{ env.TARGET == 'web' }}
+        run: |
+          API_URL=$(gcloud run services describe tp-api --project "${PROJECT_ID}" --region "${REGION}" --format="value(status.url)")
+          echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
+
+      # -------------------------------------------------------------
+      # 3. DEPLOY WEB (tp-web)
+      # -------------------------------------------------------------
+      - name: Deploy tp-web (Next.js)
+        id: deploy-web
+        if: ${{ env.TARGET == 'all' || env.TARGET == 'web' }}
+        env:
+          RESOLVED_API_URL: ${{ steps.deploy-api.outputs.api_url || steps.get-api-url.outputs.api_url }}
+          FIREBASE_CONFIG_JSON: ${{ secrets.FIREBASE_CONFIG }}
+        run: |
+          echo "==> Deploying tp-web with API: ${RESOLVED_API_URL}..."
+          
+          # Use ^@^ delimiter so commas in FIREBASE_CONFIG JSON don't break gcloud list parsing
+          gcloud run deploy tp-web \
+            --source ./web \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --allow-unauthenticated \
+            --memory 512Mi \
+            --min-instances "${MIN_INSTANCES}" \
+            --set-env-vars "^@^API_URL=${RESOLVED_API_URL}@FIREBASE_CONFIG=${FIREBASE_CONFIG_JSON}"
+
+          WEB_URL=$(gcloud run services describe tp-web --project "${PROJECT_ID}" --region "${REGION}" --format="value(status.url)")
+          echo "web_url=${WEB_URL}" >> "$GITHUB_OUTPUT"
+          echo "Deployed Web at: ${WEB_URL}"
+
+      # -------------------------------------------------------------
+      # 4. LOCK DOWN API CORS TO WEB URL
+      # -------------------------------------------------------------
+      - name: Update tp-api CORS Origins
+        if: ${{ (env.TARGET == 'all' || env.TARGET == 'web') && steps.deploy-web.outputs.web_url != '' }}
+        run: |
+          WEB_URL="${{ steps.deploy-web.outputs.web_url }}"
+          echo "==> Locking API CORS origins to: ${WEB_URL},http://localhost:3000"
+          gcloud run services update tp-api \
+            --project "${PROJECT_ID}" \
+            --region "${REGION}" \
+            --update-env-vars "^@^ALLOWED_ORIGINS=${WEB_URL},http://localhost:3000"
+
+      # -------------------------------------------------------------
+      # 5. STEP SUMMARY
+      # -------------------------------------------------------------
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "### 🚀 Cloud Run Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Service | Cloud Run URL |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| :--- | :--- |" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${{ steps.deploy-api.outputs.api_url }}" ]; then
+            echo "| **tp-api** | [${{ steps.deploy-api.outputs.api_url }}](${{ steps.deploy-api.outputs.api_url }}) |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "${{ steps.deploy-web.outputs.web_url }}" ]; then
+            echo "| **tp-web** | [${{ steps.deploy-web.outputs.web_url }}](${{ steps.deploy-web.outputs.web_url }}) |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> **Firebase Auth:** Ensure the web domain is added to Firebase Auth Authorized Domains." >> "$GITHUB_STEP_SUMMARY"

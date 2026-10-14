@@ -15,6 +15,7 @@ __pycache__/
 node_modules/
 .next/
 out/
+*.tsbuildinfo
 
 # Local generated assets
 tmp/

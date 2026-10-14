@@ -2,12 +2,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-GarmentType = Literal["dress", "top", "shirt", "skirt", "trousers", "jacket", "jumpsuit"]
+GarmentType = Literal["dress", "top", "shirt", "skirt", "trousers", "jacket", "jumpsuit", "suit"]
 Length = Literal["cropped", "hip", "knee", "midi", "maxi", "full"]
 Sleeve = Literal["sleeveless", "cap", "short", "three_quarter", "long"]
 Closure = Literal["zipper", "buttons", "hooks", "tie", "none"]
 Embellishment = Literal["embroidery", "lace", "beading", "pleats", "ruffles", "print"]
 Size = Literal["XS", "S", "M", "L", "XL", "XXL"]
+Gender = Literal["womenswear", "menswear", "unisex"]
 
 
 class DesignSpec(BaseModel):
@@ -19,6 +20,9 @@ class DesignSpec(BaseModel):
     closures: list[Closure]
     embellishments: list[Embellishment]
     lining: bool
+    gender: Gender = "womenswear"
+    size: Size | None = None
+    fit: str | None = None
 
 
 class TailorTurn(BaseModel):
@@ -29,7 +33,8 @@ class TailorTurn(BaseModel):
     image_prompt: str
     edit_instruction: str
     reply_to_user: str
-    suggested_action: Literal["none", "fitting", "measurements", "runway", "commission"] = "none"
+    suggested_action: Literal["none", "fitting", "measurements", "runway", "commission", "gender", "consultation"] = "none"
+    ready_to_sketch: bool = True
 
 
 class TechPackCritique(BaseModel):
@@ -53,6 +58,9 @@ class MessageIn(BaseModel):
     text: str | None = Field(default=None, max_length=2000)
     audio_b64: str | None = Field(default=None, max_length=14_000_000)
     audio_mime: AudioMime = "audio/webm"
+    gender: Gender | None = None
+    size: Size | None = None
+    fit: str | None = None
 
 
 class Measurements(BaseModel):
@@ -68,7 +76,7 @@ class TechPackIn(BaseModel):
 
 
 class TryOnIn(BaseModel):
-    upload_id: str = Field(min_length=1, max_length=64)
+    upload_id: str | None = Field(default=None, max_length=64)
 
 
 class OrderIn(BaseModel):
