@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useApp } from "@/lib/providers";
 import type { AtelierAction, Design } from "@/lib/types";
 
@@ -45,19 +45,13 @@ type ServerEvent =
   | { type: "runway_started"; job: any }
   | { type: "error"; message: string };
 
-export function LiveVoice({
-  designId,
-  onTranscript,
-  onTurnComplete,
-  onDesign,
-  onError,
-  onVoiceActivity,
-  onFlats,
-  onWidget,
-  onRunwayStarted,
-  onDesigning,
-  onUserSpeech,
-}: {
+export type LiveVoiceHandle = {
+  sendMessage: (text: string) => void;
+  setDesignId: (id: string) => void;
+  isActive: () => boolean;
+};
+
+export interface LiveVoiceProps {
   designId: string | null;
   onTranscript: (role: "user" | "model", text: string) => void;
   onTurnComplete: () => void;
@@ -69,10 +63,28 @@ export function LiveVoice({
   onRunwayStarted?: (job: any) => void;
   onDesigning?: () => void;
   onUserSpeech?: () => void;
-}) {
+}
+
+export const LiveVoice = forwardRef<LiveVoiceHandle, LiveVoiceProps>(function LiveVoice(
+  {
+    designId,
+    onTranscript,
+    onTurnComplete,
+    onDesign,
+    onError,
+    onVoiceActivity,
+    onFlats,
+    onWidget,
+    onRunwayStarted,
+    onDesigning,
+    onUserSpeech,
+  },
+  ref
+) {
   const { auth, api } = useApp();
   const [status, setStatus] = useState<Status>("idle");
   const session = useRef<{ stop: () => void } | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
   const handlers = useRef({
     onTranscript,
     onTurnComplete,
@@ -98,6 +110,26 @@ export function LiveVoice({
     onUserSpeech,
   };
 
+  useImperativeHandle(
+    ref,
+    () => ({
+      sendMessage: (text: string) => {
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "text", text }));
+        }
+      },
+      setDesignId: (id: string) => {
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "set_design_id", design_id: id }));
+        }
+      },
+      isActive: () => status === "connecting" || status === "listening" || status === "designing",
+    }),
+    [status]
+  );
+
   useEffect(() => () => session.current?.stop(), []);
 
   async function start() {
@@ -110,6 +142,7 @@ export function LiveVoice({
     }
 
     const ws = new WebSocket(api.liveUrl());
+    wsRef.current = ws;
     ws.binaryType = "arraybuffer";
     const playback = new AudioContext({ sampleRate: 24000 });
     const playing = new Set<AudioBufferSourceNode>();
@@ -128,6 +161,7 @@ export function LiveVoice({
     const stop = () => {
       if (stopped) return;
       stopped = true;
+      wsRef.current = null;
       if (animFrame !== null) cancelAnimationFrame(animFrame);
       handlers.current.onVoiceActivity?.(false, 0);
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "stop" }));
@@ -275,4 +309,4 @@ export function LiveVoice({
       <span>{label}</span>
     </button>
   );
-}
+});

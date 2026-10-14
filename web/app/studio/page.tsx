@@ -7,7 +7,7 @@ import {
   signOut,
 } from "firebase/auth";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArchiveDrawer } from "@/components/ArchiveDrawer";
 import { Chat } from "@/components/Chat";
 import { ErrorAlert } from "@/components/ErrorAlert";
@@ -32,7 +32,7 @@ import {
   WomenswearIcon,
 } from "@/components/icons";
 import { StaticDrape } from "@/components/landing/HeroCloth";
-import { LiveVoice } from "@/components/LiveVoice";
+import { LiveVoice, type LiveVoiceHandle } from "@/components/LiveVoice";
 import { ChatSkeleton, ShowcaseSkeleton } from "@/components/skeletons";
 import { CommissionCard } from "@/components/widgets/CommissionCard";
 import { DesignUploadCard } from "@/components/widgets/DesignUploadCard";
@@ -92,6 +92,7 @@ export default function AtelierStudio() {
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceVolume, setVoiceVolume] = useState(0);
   const [voiceDesigning, setVoiceDesigning] = useState(false);
+  const liveVoiceRef = useRef<LiveVoiceHandle | null>(null);
 
   useEffect(() => {
     api.health().then((h) => setDemoMode(h.demo_mode)).catch(() => {});
@@ -344,15 +345,24 @@ export default function AtelierStudio() {
     setBusy(true);
     setError(null);
     setActiveWidget(null);
+    const userText = notes?.trim()
+      ? `[Uploaded Design Reference: ${file.name}] ${notes}`
+      : `[Uploaded Design Reference: ${file.name}] Please tailor an haute couture outfit inspired by this design.`;
+    const ackText = `Splendid reference! I have received "${file.name}" and am analyzing its silhouette, lines, and tailoring structure now. Allow me to formulate the certified atelier textiles and begin sculpting the drape on your showcase board.`;
     setMessages((m) => [
       ...m,
-      {
-        role: "user",
-        text: notes?.trim()
-          ? `[Uploaded Design Reference: ${file.name}] ${notes}`
-          : `[Uploaded Design Reference: ${file.name}] Please tailor an haute couture outfit inspired by this design.`,
-      },
+      { role: "user", text: userText },
+      { role: "model", text: ackText },
     ]);
+
+    if (liveVoiceRef.current?.isActive()) {
+      liveVoiceRef.current.sendMessage(
+        `[ATELIER EVENT]: The VIP client has just uploaded their design reference image ('${file.name}'). ` +
+        `Speak 1 short, warm, elegant verbal sentence in your spoken voice acknowledging receipt of their reference and letting them know ` +
+        `you are analyzing its lines and beginning to sculpt their bespoke silhouette on the showcase board right now.`
+      );
+    }
+
     try {
       const d = await api.createDesignFromImage(file, notes, gender, size);
       localStorage.setItem(STORAGE_KEY, d.design_id);
@@ -368,8 +378,12 @@ export default function AtelierStudio() {
             "I have translated your uploaded sketch into an haute couture silhouette capturing its lines, texture, and spirit.",
         },
       ]);
-      if (d.suggested_action && d.suggested_action !== "none") {
-        setActiveWidget(d.suggested_action as AtelierAction);
+      if (liveVoiceRef.current?.isActive()) {
+        liveVoiceRef.current.setDesignId(d.design_id);
+        liveVoiceRef.current.sendMessage(
+          `[ATELIER UPDATE]: The bespoke design inspired by the client's reference has finished draping on the showcase board, along with technical flats and measurements. ` +
+          `Speak 1 short, warm spoken sentence informing the client that their bespoke drape and architectural technical flats are ready on the showcase board.`
+        );
       }
       loadArchive();
     } catch (e) {
@@ -390,15 +404,23 @@ export default function AtelierStudio() {
     setBusy(true);
     setError(null);
     setActiveWidget(null);
+    const userText = params.file
+      ? `[Occasion: ${params.occasion} + Portrait Provided] ${params.preferences || "Please design the ideal outfit and drape it onto my photo."}`
+      : `[Occasion: ${params.occasion}] ${params.preferences || "Please curate an outfit tailored for this event."}`;
+    const ackText = `Delightful! I am formulating an exquisite bespoke couture silhouette tailored for ${params.occasion}. Let me begin draping the textiles and preparing the cut for your showcase board.`;
     setMessages((m) => [
       ...m,
-      {
-        role: "user",
-        text: params.file
-          ? `[Occasion: ${params.occasion} + Portrait Provided] ${params.preferences || "Please design the ideal outfit and drape it onto my photo."}`
-          : `[Occasion: ${params.occasion}] ${params.preferences || "Please curate an outfit tailored for this event."}`,
-      },
+      { role: "user", text: userText },
+      { role: "model", text: ackText },
     ]);
+
+    if (liveVoiceRef.current?.isActive()) {
+      liveVoiceRef.current.sendMessage(
+        `[ATELIER EVENT]: The VIP client has specified their upcoming occasion: '${params.occasion}'. ` +
+        `Speak 1 short, warm, elegant verbal sentence in your spoken voice acknowledging their event and confirming you are beginning to concoct the ideal bespoke silhouette for them now.`
+      );
+    }
+
     try {
       const d = await api.createDesignForOccasion(params);
       localStorage.setItem(STORAGE_KEY, d.design_id);
@@ -420,8 +442,12 @@ export default function AtelierStudio() {
               : `I have curated a bespoke silhouette designed for ${params.occasion}.`),
         },
       ]);
-      if (d.suggested_action && d.suggested_action !== "none") {
-        setActiveWidget(d.suggested_action as AtelierAction);
+      if (liveVoiceRef.current?.isActive()) {
+        liveVoiceRef.current.setDesignId(d.design_id);
+        liveVoiceRef.current.sendMessage(
+          `[ATELIER UPDATE]: The bespoke outfit designed for ${params.occasion} has finished draping on the showcase board. ` +
+          `Speak 1 short spoken sentence inviting the client to view the drape and architectural technical flats.`
+        );
       }
       loadArchive();
     } catch (e) {
@@ -794,6 +820,7 @@ export default function AtelierStudio() {
           voiceVolume={voiceVolume}
           headerAction={
             <LiveVoice
+              ref={liveVoiceRef}
               designId={design?.design_id ?? null}
               onTranscript={liveTranscript}
               onTurnComplete={liveTurnComplete}

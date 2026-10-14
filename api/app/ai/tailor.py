@@ -309,8 +309,9 @@ def converse_with_design_image(
     turn = parse_structured(response, TailorTurn)
     turn.user_transcript = text or "Bespoke design generated from uploaded design inspiration."
     turn.ready_to_sketch = True
-    if explicit_gender and explicit_gender in ("menswear", "womenswear", "unisex"):
-        turn.spec.gender = explicit_gender
+    inferred_gender = explicit_gender or detect_semantic_gender(sanitized_text)
+    if inferred_gender and inferred_gender in ("menswear", "womenswear", "unisex"):
+        turn.spec.gender = inferred_gender
     if size:
         turn.spec.size = size
     turn = apply_output_guardrail(turn, brand_notice=brand_notice, current_spec=None)

@@ -327,6 +327,11 @@ async def live_session(ws: WebSocket):
                             continue
                         if data.get("type") == "stop":
                             return
+                        if data.get("type") == "set_design_id":
+                            new_id = data.get("design_id")
+                            if new_id:
+                                state["design_id"] = str(new_id)
+                            continue
                         if data.get("type") == "text" and data.get("text"):
                             try:
                                 await session.send_realtime_input(text=str(data["text"])[:2000])

@@ -56,7 +56,7 @@ const STEPS = [
 
 function ReceiptMini() {
   return (
-    <div className="lp-receipt" style={{ width: "min(100%, 320px)" }}>
+    <div className="lp-receipt lp-receipt-mini">
       <div className="lp-receipt-stats">
         <span>Silk Charmeuse</span>
         <span>4.14 yd</span>
