@@ -24,6 +24,7 @@ from .clients import live as live_client
 from .config import settings
 from .models import MessageIn
 from .service import continue_design, create_design, generate_flats_service, start_runway_service
+from .ai.guardrails import get_off_topic_redirection, is_off_topic_query
 
 # Prevent websockets from terminating live sessions with 1011 keepalive ping timeouts.
 # Gemini Live streams actively and bi-directionally, but server-side model inference or
@@ -62,6 +63,18 @@ SYSTEM_PROMPT = """You are "The Master Couturier" at Thread & Pixel, speaking li
   * If male: tailor menswear / masculine couture silhouettes (e.g., bespoke tailored suits, structured blazers, tuxedos, architectural jackets, dress trousers, polo shirts, masculine formalwear). Call update_design with gender='menswear'.
   * If female: tailor womenswear / feminine couture silhouettes (e.g., evening gowns, cocktail dresses, draped silk jumpsuits, bespoke skirts, feminine tailored ensembles). Call update_design with gender='womenswear'.
   * Seamlessly sculpt the garment directly suited to their perceived gender on their first voice turn without ever asking them whether they are male or female in voice mode.
+- OFF-TOPIC & BACKGROUND VOICE CONVERSATION IDENTIFICATION & REDIRECTION (CRITICAL):
+  * You are EXCLUSIVELY The Master Couturier at Thread & Pixel, dedicated solely to bespoke haute couture fashion, custom garment tailoring, fabrics, silhouettes, and styling.
+  * Microphones frequently capture background audio (e.g. someone talking in the room about insurance, documents, household tasks, television) or foreground off-topic queries (such as medical insurance forms, health questions, legal issues, taxes, finances, cooking, coding, homework, personal errands).
+  * When off-topic conversation or background ambient chatter is captured:
+    1. IDENTIFY IT IMMEDIATELY as off-topic or background chatter.
+    2. NEVER SPIN OFF INTO THE OFF-TOPIC TOPIC: Under NO circumstances should you answer the off-topic query, give insurance/medical/legal advice or disclaimers, or discuss filling out forms!
+    3. NEVER call any tools (update_design, draft_flats, open_fitting, generate_runway) on off-topic chatter.
+    4. STAY ON TOPIC AS THE MASTER COUTURIER: Speak 1 short, warm, elegant sentence in your spoken voice:
+       - If ambient background speech: gently note that background chatter was overheard, and reaffirm you are standing by for their bespoke design.
+       - If an off-topic question: politely clarify that you specialize strictly in bespoke fashion and cannot advise on outside topics.
+       - Guide the client directly back to their garment design (e.g. "Shall we continue with your bespoke design?").
+    5. STRICT LANGUAGE RETENTION: Always respond in the EXACT SAME language spoken by the client (e.g., if the user spoke in Malayalam, respond in Malayalam; if English, respond in English; etc.).
 - BESPOKE CONSULTATION BEFORE SKETCHING (CRITICAL):
   * When the client mentions only a broad or initial garment type (e.g. "I'm looking for a polo", "I want a dress", "Can you make me a suit?", "I need a shirt") without basic details (color, fit/silhouette, fabric, size):
     DO NOT call update_design immediately!
@@ -249,6 +262,27 @@ async def live_session(ws: WebSocket):
                         gender = args.get("gender")
                         size = args.get("size")
                         fit = args.get("fit")
+
+                        # Domain Boundary Check: Intercept off-topic or background speech tool attempts
+                        if is_off_topic_query(request):
+                            start_notice = {
+                                "status": "off_topic_intercepted",
+                                "instruction": (
+                                    "This request was identified as off-topic or background chatter outside bespoke fashion atelier design. "
+                                    "Do NOT sketch or draft anything. "
+                                    "Speak 1 short, warm, polite sentence in the client's spoken language reminding them that you are The Master Couturier "
+                                    "dedicated solely to their bespoke couture wardrobe, and guide them back to their atelier design."
+                                ),
+                            }
+                            try:
+                                await session.send_tool_response(
+                                    function_responses=[types.FunctionResponse(id=call.id, name=call.name, response=start_notice)]
+                                )
+                                response_sent = True
+                            except (ConnectionClosed, genai_errors.APIError):
+                                return
+                            return
+
                         await send({"type": "tool_start", "tool": name, "request": request})
                         await send({"type": "designing", "request": request})
 
@@ -279,6 +313,18 @@ async def live_session(ws: WebSocket):
                         async def _run_design_bg():
                             try:
                                 design = await asyncio.to_thread(_run_tool, user, state, request, gender, size, fit)
+                                if design.get("is_off_topic"):
+                                    notice = (
+                                        "[ATELIER NOTICE]: The captured input was identified as off-topic or background chatter outside bespoke couture. "
+                                        "Do not sketch or alter the design. Speak 1 short spoken sentence in the client's spoken language "
+                                        "reassuring them you are The Master Couturier standing by for their bespoke design."
+                                    )
+                                    try:
+                                        await session.send_realtime_input(text=notice)
+                                    except Exception as exc:
+                                        log.warning("live: notice send failed: %s", exc)
+                                    return
+
                                 state["design_id"] = design["design_id"]
                                 await send({"type": "design", "design": design})
                                 if design.get("flats_url"):

@@ -66,6 +66,72 @@ def sanitize_input_text(text: str) -> tuple[str, str | None]:
     return text, None
 
 
+# Off-topic non-couture advice and disclaimer indicators
+OFFTOPIC_ADVICE_PATTERNS = [
+    r"വൈദ്യോപദേശമോ",
+    r"രോഗനിർണ്ണയമോ",
+    r"ആരോഗ്യരക്ഷാ\s*വിദഗ്ധ",
+    r"ഇൻഷുറൻസ്\s*(കമ്പനി|പോളിസി|ക്ലെയിം|ഏജന്റ്|ഫോം|പ്രൊഫഷണൽ)",
+    r"not\s+medical\s+advice",
+    r"medical\s+(advice|diagnosis|treatment|opinion)",
+    r"consult\s+(a|an|your)?\s*(doctor|physician|healthcare|medical|insurance|attorney|lawyer)",
+    r"insurance\s+(company|agent|policy|claim|coverage|form|fill)",
+    r"legal\s+(advice|counsel|opinion)",
+    r"tax\s+(advice|consultant|return|form)",
+]
+OFFTOPIC_ADVICE_REGEX = re.compile("|".join(OFFTOPIC_ADVICE_PATTERNS), re.IGNORECASE)
+
+OFFTOPIC_STRONG_PATTERNS = [
+    r"ഇൻഷുറൻസ്",
+    r"മെഡിക്കൽ\s*ഇൻഷുറൻസ്",
+    r"മെഡിക്കൽ\s*റിപ്പോർട്ട്",
+    r"ക്ലെയിം\s*നിരസിക്കപ്പെടാൻ",
+    r"insurance\s*(policy|claim|form|agent|company)",
+    r"medical\s*(insurance|claim|report|bill|form)",
+    r"income\s*tax",
+    r"tax\s*(return|audit|deduction|filing)",
+]
+OFFTOPIC_STRONG_REGEX = re.compile("|".join(OFFTOPIC_STRONG_PATTERNS), re.IGNORECASE)
+
+FASHION_KEYWORD_PATTERNS = [
+    r"\b(dress|suit|blazer|jacket|shirt|trousers|pants|skirt|gown|tuxedo|jumpsuit|polo|coat|overcoat)\b",
+    r"\b(fabric|silk|linen|wool|cotton|velvet|chiffon|satin|denim|leather|jersey|pique|suiting|crepe)\b",
+    r"\b(lapel|collar|sleeve|hem|silhouette|couture|atelier|tailor|tailoring|fitting|measurements|garment|runway|drape|pleat|pockets)\b",
+    r"(വസ്ത്ര|സ്യൂട്ട്|ബ്ലേസർ|ഷർട്ട്|സാരി|പാവാട|കോട്ടൺ|സിൽക്ക്|ഫാബ്രിക്|ഡിസൈൻ|തയ്യൽ)",
+]
+FASHION_KEYWORD_REGEX = re.compile("|".join(FASHION_KEYWORD_PATTERNS), re.IGNORECASE)
+
+
+def is_off_topic_query(text: str) -> bool:
+    """Checks whether text is unambiguously off-topic (e.g. medical insurance, legal advice, taxes)
+    without any fashion, garment, or atelier context."""
+    if not text or not text.strip():
+        return False
+    if OFFTOPIC_STRONG_REGEX.search(text):
+        if not FASHION_KEYWORD_REGEX.search(text):
+            return True
+    return False
+
+
+def get_off_topic_redirection(user_text: str = "", garment_name: str | None = None) -> str:
+    """Generates an elegant Couturier redirection in the appropriate language (Malayalam or English)."""
+    # Detect Malayalam script: Unicode range \u0d00-\u0d7f
+    is_malayalam = bool(re.search(r"[\u0d00-\u0d7f]", user_text))
+    garment_ref = garment_name or ("വസ്ത്ര" if is_malayalam else "bespoke garment")
+
+    if is_malayalam:
+        return (
+            "ക്ഷമിക്കണം, ഞാൻ ത്രെഡ് & പിക്സലിലെ മാസ്റ്റർ കൗച്ചൂറിയർ ആണ്. എന്റെ ശ്രദ്ധ പൂർണ്ണമായും നിങ്ങളുടെ "
+            "ബെസ്പോക്ക് ഫാഷൻ രൂപകൽപ്പനയിലാണ്; മറ്റ് വിഷയങ്ങളിൽ എനിക്ക് ഉപദേശം നൽകാൻ സാധിക്കില്ല. "
+            f"നമുക്ക് നിങ്ങളുടെ {garment_ref} ഡിസൈനിലേക്ക് തന്നെ ശ്രദ്ധ കേന്ദ്രീകരിക്കാം; ഇതിൽ കൂടുതൽ എന്തെങ്കിലും മാറ്റങ്ങൾ വരുത്താനുണ്ടോ?"
+        )
+    return (
+        "As The Master Couturier at Thread & Pixel, my atelier is devoted exclusively to bespoke couture fashion. "
+        "I cannot advise on non-fashion matters. "
+        f"Shall we return to perfecting your {garment_ref} design?"
+    )
+
+
 def validate_spec_guardrail(spec: DesignSpec) -> DesignSpec:
     """Ensures fabric_id is strictly bounded to certified atelier fabrics."""
     if spec.fabric_id not in FABRICS:
@@ -92,12 +158,32 @@ def apply_output_guardrail(
     turn: TailorTurn,
     brand_notice: str | None = None,
     has_vto: bool = False,
+    current_spec: DesignSpec | None = None,
 ) -> TailorTurn:
-    """Enforces output integrity, fabric whitelist, and sensible next-step prompts."""
+    """Enforces output integrity, fabric whitelist, off-topic domain deflection, and sensible next-step prompts."""
     turn.spec = validate_spec_guardrail(turn.spec)
 
     if brand_notice:
         turn.reply_to_user = f"{brand_notice} {turn.reply_to_user}".strip()
+
+    # Domain Boundary Check: Intercept model responses containing off-topic advice or disclaimers
+    if OFFTOPIC_ADVICE_REGEX.search(turn.reply_to_user) or is_off_topic_query(turn.user_transcript):
+        turn.is_off_topic = True
+
+    if turn.is_off_topic:
+        turn.ready_to_sketch = False
+        turn.edit_instruction = ""
+        turn.suggested_action = "none"
+        if current_spec:
+            turn.spec = current_spec
+        # If the reply contains off-topic advice/disclaimers or lacks couture redirection, sanitize it
+        if OFFTOPIC_ADVICE_REGEX.search(turn.reply_to_user):
+            garment_label = current_spec.garment_type if current_spec else None
+            turn.reply_to_user = get_off_topic_redirection(
+                user_text=f"{turn.user_transcript} {turn.reply_to_user}",
+                garment_name=garment_label,
+            )
+        return turn
 
     if not turn.ready_to_sketch:
         turn.suggested_action = "consultation"

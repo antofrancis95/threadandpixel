@@ -25,6 +25,7 @@ export type Design = {
   transcript: string | null;
   suggested_action?: "none" | "fitting" | "measurements" | "runway" | "commission" | "gender" | "consultation";
   messages?: ChatMessage[];
+  is_off_topic?: boolean;
 };
 
 export type DesignSummary = {

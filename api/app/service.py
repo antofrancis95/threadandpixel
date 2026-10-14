@@ -55,6 +55,7 @@ def design_response(
     reply: str | None = None,
     transcript: str | None = None,
     suggested_action: str | None = None,
+    is_off_topic: bool = False,
 ) -> dict:
     def url(key: str) -> str | None:
         return storage.signed_url(data[key]) if data.get(key) else None
@@ -72,6 +73,7 @@ def design_response(
         "transcript": transcript,
         "messages": data.get("messages", []),
         "suggested_action": suggested_action or data.get("suggested_action", "none"),
+        "is_off_topic": is_off_topic,
     }
 
 
@@ -87,13 +89,14 @@ def create_design(user: User, msg: MessageIn) -> dict:
         {"role": "model", "text": turn.reply_to_user},
     ]
 
-    if not turn.ready_to_sketch:
-        # Initial consultation turn: do NOT sketch yet. Record consultation state and ask for basic specs.
+    if turn.is_off_topic or not turn.ready_to_sketch:
+        # Initial consultation or off-topic turn: do NOT sketch yet. Record consultation state and ask for basic specs.
+        action = "none" if turn.is_off_topic else turn.suggested_action
         data = {
             "uid": user.uid,
             "spec": turn.spec.model_dump(),
             "image_prompt": turn.image_prompt,
-            "suggested_action": turn.suggested_action,
+            "suggested_action": action,
             "current_version": 0,
             "current_image_path": None,
             "flats_path": None,
@@ -105,7 +108,7 @@ def create_design(user: User, msg: MessageIn) -> dict:
         }
         ref.set(data)
         save_turn(ref, turn.user_transcript, turn.reply_to_user)
-        return design_response(ref.id, data, turn.reply_to_user, turn.user_transcript, turn.suggested_action)
+        return design_response(ref.id, data, turn.reply_to_user, turn.user_transcript, action, is_off_topic=turn.is_off_topic)
 
     # Basic specifications are present; proceed to sketch!
     image, mime = demo.image("design-create", lambda: designer.generate(turn.image_prompt))
@@ -169,6 +172,18 @@ def continue_design(user: User, design_id: str, msg: MessageIn) -> dict:
     ]
     existing_msgs = data.get("messages") or []
     updated_msgs = existing_msgs + new_turn
+
+    if turn.is_off_topic:
+        # Off-topic input captured in background or foreground:
+        # Do NOT modify design spec, do NOT trigger image edits, do NOT increment version!
+        updates: dict = {
+            "updated_at": firestore.SERVER_TIMESTAMP,
+            "messages": updated_msgs,
+        }
+        ref.update(updates)
+        save_turn(ref, turn.user_transcript, turn.reply_to_user)
+        data["messages"] = updated_msgs
+        return design_response(ref.id, data, turn.reply_to_user, turn.user_transcript, "none", is_off_topic=True)
 
     updates: dict = {
         "spec": turn.spec.model_dump(),

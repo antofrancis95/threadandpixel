@@ -1,7 +1,7 @@
 # Provisions GCP resources for Thread & Pixel. Safe to re-run (skips what already exists).
 param(
     [string]$Project = "datavision-482713",
-    [string]$Region = "us-central1"
+    [string]$Region = "asia-southeast1"
 )
 # Native stderr must not be terminating on PS 5.1; failures are checked via $LASTEXITCODE.
 $ErrorActionPreference = "Continue"

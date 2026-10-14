@@ -28,6 +28,7 @@ class Settings:
     model_video: str
     model_live: str
     live_location: str
+    imaging_location: str
     demo_mode: str
     demo_timeout_s: float
     allowed_origins: list[str]
@@ -40,12 +41,13 @@ DEMO_MODES = {"off", "record", "fallback", "replay"}
 def load_settings() -> Settings:
     on_cloud_run = "K_SERVICE" in os.environ
     gemini_location = os.environ.get("GEMINI_LOCATION", "global")
+    imaging_location = os.environ.get("IMAGING_LOCATION", "us-central1")
     demo_mode = os.environ.get("DEMO_MODE", "off").lower()
     if demo_mode not in DEMO_MODES:
         raise RuntimeError(f"DEMO_MODE must be one of {sorted(DEMO_MODES)}")
     return Settings(
         project=_req("GOOGLE_CLOUD_PROJECT"),
-        region=os.environ.get("GOOGLE_CLOUD_REGION", "us-central1"),
+        region=os.environ.get("GOOGLE_CLOUD_REGION", "asia-southeast1"),
         gemini_location=gemini_location,
         bucket=_req("ASSET_BUCKET"),
         signing_sa=os.environ.get("SIGNING_SA_EMAIL") or None,
@@ -57,6 +59,7 @@ def load_settings() -> Settings:
         model_video=os.environ.get("MODEL_VIDEO", "veo-3.1-fast-generate-001"),
         model_live=os.environ.get("MODEL_LIVE", "gemini-3.8-live"),
         live_location=os.environ.get("LIVE_LOCATION", gemini_location),
+        imaging_location=imaging_location,
         demo_mode=demo_mode,
         demo_timeout_s=float(os.environ.get("DEMO_TIMEOUT_S", "25")),
         allowed_origins=[o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",") if o.strip()],

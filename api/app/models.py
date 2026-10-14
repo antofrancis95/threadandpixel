@@ -35,6 +35,7 @@ class TailorTurn(BaseModel):
     reply_to_user: str
     suggested_action: Literal["none", "fitting", "measurements", "runway", "commission", "gender", "consultation"] = "none"
     ready_to_sketch: bool = True
+    is_off_topic: bool = False
 
 
 class TechPackCritique(BaseModel):

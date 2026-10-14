@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Configuration defaults
 PROJECT_ID="${1:-datavision-482713}"
-REGION="${2:-us-central1}"
+REGION="${2:-asia-southeast1}"
 GITHUB_REPO="${3:-antofrancis95/thread-pixel}"
 POOL_NAME="github-actions-pool"
 PROVIDER_NAME="github-provider"

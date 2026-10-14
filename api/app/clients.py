@@ -25,7 +25,7 @@ def gemini() -> genai.Client:
 
 @lru_cache
 def imaging() -> genai.Client:
-    return _genai_client(settings.region)
+    return _genai_client(settings.imaging_location)
 
 
 @lru_cache

@@ -1,5 +1,11 @@
 import pytest
-from app.ai.guardrails import apply_output_guardrail, sanitize_input_text, validate_spec_guardrail
+from app.ai.guardrails import (
+    apply_output_guardrail,
+    get_off_topic_redirection,
+    is_off_topic_query,
+    sanitize_input_text,
+    validate_spec_guardrail,
+)
 from app.ai.tailor import AtelierCouturierAgent
 from app.models import DesignSpec, TailorTurn
 
@@ -120,5 +126,99 @@ def test_size_measurements_catalog():
         assert size in SIZE_MEASUREMENTS["shirt"]
         assert "Chest Width" in SIZE_MEASUREMENTS["shirt"][size]
         assert "Body Length" in SIZE_MEASUREMENTS["shirt"][size]
+
+
+def test_is_off_topic_query_detection():
+    # Malayalam medical insurance queries (from user screenshot)
+    malayalam_insurance = (
+        "മെഡിക്കൽ ഇൻഷുറൻസ് റിപ്പോർട്ടർ അവിടെ എനിക്ക് എഴുതാൻ പറ്റില്ല എന്ന് ഞാൻ തന്നെ ആൻസർ തന്നാലോ? "
+        "ഞാൻ അവിടെ എഴുതി പോയിട്ട് 12 ലാക്സ് എന്ന്. ആ ടിക്ക് ഇടാൻ പറ്റുന്നില്ലേ? ഞാൻ എസ് എന്ന് എഴുതിയിട്ടോ?"
+    )
+    assert is_off_topic_query(malayalam_insurance) is True
+
+    # English medical insurance queries
+    assert is_off_topic_query("How do I fill out this medical insurance claim form?") is True
+    assert is_off_topic_query("Where do I submit my income tax return?") is True
+
+    # Legitimate bespoke fashion queries must pass
+    assert is_off_topic_query("A bespoke midnight navy wool-suiting tuxedo with satin lapels.") is False
+    assert is_off_topic_query("Can you make me a charcoal checkered blazer in size 42?") is False
+    assert is_off_topic_query("എനിക്ക് കറുത്ത നിറത്തിലുള്ള സ്യൂട്ട് വേണം") is False
+
+
+def test_output_guardrail_handles_explicit_off_topic():
+    current_spec = DesignSpec(
+        garment_type="jacket",
+        length="hip",
+        sleeve="long",
+        fabric_id="wool-suiting",
+        color_hex="#333333",
+        closures=["buttons"],
+        embellishments=[],
+        lining=True,
+    )
+    turn = TailorTurn(
+        user_transcript="Someone in the background talking about insurance",
+        spec=DesignSpec(
+            garment_type="dress",
+            length="maxi",
+            sleeve="short",
+            fabric_id="cotton-poplin",
+            color_hex="#FFFFFF",
+            closures=["none"],
+            embellishments=[],
+            lining=False,
+        ),
+        image_prompt="A dress",
+        edit_instruction="change dress",
+        reply_to_user="I am The Master Couturier at Thread & Pixel. Shall we return to your jacket design?",
+        suggested_action="fitting",
+        ready_to_sketch=True,
+        is_off_topic=True,
+    )
+    guarded = apply_output_guardrail(turn, current_spec=current_spec)
+    assert guarded.is_off_topic is True
+    assert guarded.ready_to_sketch is False
+    assert guarded.edit_instruction == ""
+    assert guarded.suggested_action == "none"
+    assert guarded.spec.garment_type == "jacket"
+    assert guarded.spec.fabric_id == "wool-suiting"
+
+
+def test_output_guardrail_intercepts_disclaimer_leak_in_malayalam():
+    # If the model slipped and generated medical insurance advice with disclaimer (as in screenshot)
+    disclaimer_leak = (
+        "മെഡിക്കൽ ഇൻഷുറൻസ് ഫോമിൽ വിവരങ്ങൾ കൃത്യമായി രേഖപ്പെടുത്തേണ്ടത് വളരെ പ്രധാനമാണ്. "
+        "ഇത് വൈദ്യോപദേശമോ രോഗനിർണ്ണയമോ അല്ല; കൃത്യമായ വിവരങ്ങൾക്ക് ദയവായി ഒരു ഇൻഷുറൻസ് പ്രൊഫഷണലിനെയോ സമീപിക്കുക."
+    )
+    turn = TailorTurn(
+        user_transcript="മെഡിക്കൽ ഇൻഷുറൻസ് റിപ്പോർട്ടർ",
+        spec=DesignSpec(
+            garment_type="jacket",
+            length="hip",
+            sleeve="long",
+            fabric_id="wool-suiting",
+            color_hex="#333333",
+            closures=["buttons"],
+            embellishments=[],
+            lining=True,
+        ),
+        image_prompt="",
+        edit_instruction="random edit",
+        reply_to_user=disclaimer_leak,
+        suggested_action="measurements",
+        ready_to_sketch=True,
+        is_off_topic=False,  # Model initially forgot to mark it
+    )
+    guarded = apply_output_guardrail(turn)
+    # Guardrail must catch the disclaimer and intercept!
+    assert guarded.is_off_topic is True
+    assert guarded.ready_to_sketch is False
+    assert guarded.edit_instruction == ""
+    assert guarded.suggested_action == "none"
+    # Reply must be sanitized to Couturier deflection in Malayalam
+    assert "മാസ്റ്റർ കൗച്ചൂറിയർ" in guarded.reply_to_user
+    assert "വൈദ്യോപദേശമോ" not in guarded.reply_to_user
+
 
 

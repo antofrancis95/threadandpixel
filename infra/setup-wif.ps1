@@ -1,7 +1,7 @@
 # Sets up Workload Identity Federation (WIF) for GitHub Actions on GCP
 param(
     [string]$Project = "datavision-482713",
-    [string]$Region = "us-central1",
+    [string]$Region = "asia-southeast1",
     [string]$GithubRepo = "antofrancis95/thread-pixel"
 )
 

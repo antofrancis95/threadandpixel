@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID || 'datavision-482713' }}
-      REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+      REGION: ${{ vars.GCP_REGION || 'asia-southeast1' }}
       RUNTIME_SA: ${{ vars.RUNTIME_SA || 'tp-runtime@datavision-482713.iam.gserviceaccount.com' }}
       ASSET_BUCKET: ${{ vars.ASSET_BUCKET || 'tp-assets-datavision-482713' }}
       MIN_INSTANCES: ${{ vars.MIN_INSTANCES || '1' }}
@@ -100,6 +100,7 @@ jobs:
           ENV_VARS="${ENV_VARS},GOOGLE_CLOUD_REGION=${REGION}"
           ENV_VARS="${ENV_VARS},ASSET_BUCKET=${ASSET_BUCKET}"
           ENV_VARS="${ENV_VARS},GEMINI_LOCATION=${{ vars.GEMINI_LOCATION || 'global' }}"
+          ENV_VARS="${ENV_VARS},IMAGING_LOCATION=${{ vars.IMAGING_LOCATION || 'us-central1' }}"
           ENV_VARS="${ENV_VARS},LIVE_LOCATION=${{ vars.LIVE_LOCATION || 'us-central1' }}"
           ENV_VARS="${ENV_VARS},MODEL_FLASH=${{ vars.MODEL_FLASH || 'gemini-3.8-flash' }}"
           ENV_VARS="${ENV_VARS},MODEL_LITE=${{ vars.MODEL_LITE || 'gemini-3.5-flash-lite' }}"
@@ -170,11 +171,11 @@ jobs:
         if: ${{ (env.TARGET == 'all' || env.TARGET == 'web') && steps.deploy-web.outputs.web_url != '' }}
         run: |
           WEB_URL="${{ steps.deploy-web.outputs.web_url }}"
-          echo "==> Locking API CORS origins to: ${WEB_URL},https://tp-web-1023298632546.us-central1.run.app,http://localhost:3000"
+          echo "==> Locking API CORS origins to: https://threadandpixel.shop,https://www.threadandpixel.shop,${WEB_URL},http://localhost:3000"
           gcloud run services update tp-api \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --update-env-vars "^@^ALLOWED_ORIGINS=${WEB_URL},https://tp-web-1023298632546.us-central1.run.app,http://localhost:3000"
+            --update-env-vars "^@^ALLOWED_ORIGINS=https://threadandpixel.shop,https://www.threadandpixel.shop,${WEB_URL},http://localhost:3000"
 
       # -------------------------------------------------------------
       # 5. STEP SUMMARY

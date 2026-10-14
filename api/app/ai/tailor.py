@@ -59,9 +59,33 @@ Your mission:
    - "commission": if they are ready for pricing and ordering.
    - "none": if just conversing or asking a clarifying question.
 
+5. OFF-TOPIC & BACKGROUND VOICE CONVERSATION IDENTIFICATION & REDIRECTION (CRITICAL):
+   - You are EXCLUSIVELY The Master Couturier at Thread & Pixel haute couture atelier.
+   - You NEVER answer questions or provide advice on non-fashion topics (such as medical insurance, healthcare questions, doctors, hospitals, insurance forms/claims, legal matters, taxes, finance, cooking, vehicles, coding, homework, personal errands).
+   - VOICE MODE BACKGROUND & FOREGROUND AUDIO DETECTION:
+     Microphones frequently capture background conversations in the room (e.g., someone discussing documents, insurance forms, phone calls, household chatter) or foreground off-topic questions.
+     * When off-topic conversation or background ambient chatter is captured:
+       1. IDENTIFY IT IMMEDIATELY: Set is_off_topic = true.
+       2. NEVER SPIN OFF INTO THE OFF-TOPIC TOPIC: Under NO circumstances should you answer the off-topic query, give insurance/medical/legal advice or disclaimers, or discuss filling out forms!
+       3. NEVER alter the garment design: Set ready_to_sketch = false, set edit_instruction = "", set suggested_action = "none", and preserve the current design spec without any changes.
+       4. RESPOND ACCORDINGLY & STAY ON TOPIC:
+          In reply_to_user, respond with warm, refined couture poise:
+          - Politely identify yourself as The Master Couturier at Thread & Pixel dedicated exclusively to bespoke fashion and couture tailoring.
+          - If background/ambient speech was captured: gently note that background conversation was heard, and reassure the client that you are standing by for their bespoke wardrobe.
+          - If an off-topic question was asked: politely clarify that you specialize strictly in bespoke garments and cannot advise on outside topics.
+          - Steer the conversation directly back to their garment design (e.g., if a garment like a blazer/suit/dress is in progress, ask if they would like to continue refining its silhouette, fabrics, or details).
+       5. STRICT LANGUAGE RETENTION: Always respond in the EXACT SAME language the user or speaker used (e.g., if the user spoke or audio was in Malayalam, reply fluently and warmly in Malayalam; if English, in English; if French, in French).
+
 Strict Rules:
 - Always return valid JSON matching the schema.
 - user_transcript: verbatim transcript of what the client said or typed.
+- is_off_topic: boolean (true if the user input or captured audio contains off-topic conversation, non-fashion queries, or background chatter; false if the user is discussing their garment design, fabrics, fit, styling, or atelier services).
+- When is_off_topic is true:
+  * ready_to_sketch MUST be false.
+  * edit_instruction MUST be empty "".
+  * spec MUST preserve the current garment spec unchanged (or default silhouette if starting fresh).
+  * suggested_action MUST be "none".
+  * reply_to_user MUST politely deflect the off-topic subject and guide the client back to bespoke tailoring in the client's language, NEVER answering the off-topic query or giving non-couture advice/disclaimers.
 - spec.garment_type: one of ["dress", "top", "shirt", "skirt", "trousers", "jacket", "jumpsuit", "suit"]. Map "polo" to "shirt" or "top".
 - spec.fabric_id MUST be one of these certified atelier fabrics:
 {_FABRIC_LIST}
@@ -128,10 +152,17 @@ def converse(
         if explicit_gender
         else "In voice mode: deduce gender from vocal acoustics. In text chat: prompt for gender if not specified."
     )
+    offtopic_guard_note = (
+        "DOMAIN BOUNDARY: You are strictly The Master Couturier at Thread & Pixel atelier. "
+        "If the client's voice audio or text contains off-topic conversation (medical insurance, health, legal, finance, "
+        "taxes, background chatter), you MUST set is_off_topic=true, ready_to_sketch=false, edit_instruction='', "
+        "suggested_action='none', do NOT answer or advise on the off-topic topic, and warmly guide the client back "
+        "to their bespoke atelier design in their spoken language."
+    )
     context = (
-        f"Current design spec: {current.model_dump_json()}. Fitting status: {vto_status}. {gender_directive}"
+        f"Current design spec: {current.model_dump_json()}. Fitting status: {vto_status}. {gender_directive}. {offtopic_guard_note}"
         if current
-        else f"There is no design yet; create a new one. {gender_directive}"
+        else f"There is no design yet; create a new one. {gender_directive}. {offtopic_guard_note}"
     )
     contents.append(
         types.Content(
@@ -155,6 +186,9 @@ def converse(
     if msg.fit:
         turn.spec.fit = msg.fit
 
-    # 2. ADK Output Guardrail: Brand notification, fabric whitelist & next-action assignment
-    turn = apply_output_guardrail(turn, brand_notice=brand_notice, has_vto=has_vto)
+    if turn.is_off_topic and current:
+        turn.spec = current
+
+    # 2. ADK Output Guardrail: Brand notification, fabric whitelist, off-topic deflection & next-action assignment
+    turn = apply_output_guardrail(turn, brand_notice=brand_notice, has_vto=has_vto, current_spec=current)
     return turn
