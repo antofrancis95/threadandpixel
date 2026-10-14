@@ -251,6 +251,8 @@ async def live_session(ws: WebSocket):
                         await send({"type": "tool_start", "tool": name, "request": request})
                         await send({"type": "designing", "request": request})
 
+                        fit_label = fit or "tailored"
+                        gender_label = f" {gender}" if gender else ""
                         # Respond to Gemini Live immediately so it speaks the verbal confirmation turn without delay
                         start_notice = {
                             "status": "sketching_started",
@@ -260,7 +262,7 @@ async def live_session(ws: WebSocket):
                             "gender": gender,
                             "instruction": (
                                 "Speak a short, warm, elegant verbal confirmation to the client in your spoken voice RIGHT NOW "
-                                f"(1 concise sentence, e.g. 'Splendid choice! Let me start sketching that {fit or \"tailored\"} {gender or \"\"} polo for you now.'). "
+                                f"(1 concise sentence, e.g. 'Splendid choice! Let me start sketching that {fit_label}{gender_label} polo for you now.'). "
                                 "Explicitly acknowledge their bespoke choices and tell the client you are beginning the sketch and drafting technical flats with measurements."
                             ),
                         }

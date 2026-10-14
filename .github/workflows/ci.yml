@@ -36,6 +36,7 @@ jobs:
       - name: Run Pytest
         working-directory: api
         run: |
+          python -m py_compile app/*.py app/**/*.py
           cp .env.example .env
           PYTHONPATH=. pytest tests -v
 
