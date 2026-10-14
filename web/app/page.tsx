@@ -106,14 +106,21 @@ export default function AtelierStudio() {
         setIsAllowed(res.allowed);
         setUserRole(res.role ?? null);
         if (!res.allowed) {
-          setAuthDeniedReason(res.reason || "Your Google account is not on the Atelier allowlist.");
+          setAuthDeniedReason(res.reason || "Your account is not on the Atelier allowlist.");
         } else {
           setAuthDeniedReason(null);
         }
       })
       .catch((err) => {
         setIsAllowed(false);
-        setAuthDeniedReason((err as Error).message);
+        const msg = (err as Error).message || "";
+        if (msg.includes("Failed to fetch")) {
+          setAuthDeniedReason(
+            "Connection error connecting to Atelier services. Please check your network or try again.",
+          );
+        } else {
+          setAuthDeniedReason(msg);
+        }
       })
       .finally(() => {
         setAuthChecking(false);

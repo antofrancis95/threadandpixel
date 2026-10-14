@@ -32,7 +32,7 @@ app = FastAPI(title="Thread & Pixel API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$|^https://.*\.run\.app$|^https://.*\.a\.run\.app$",
     allow_methods=["*"],
     allow_headers=["*"],
 )

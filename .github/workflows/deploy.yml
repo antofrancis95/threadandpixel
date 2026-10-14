@@ -170,11 +170,11 @@ jobs:
         if: ${{ (env.TARGET == 'all' || env.TARGET == 'web') && steps.deploy-web.outputs.web_url != '' }}
         run: |
           WEB_URL="${{ steps.deploy-web.outputs.web_url }}"
-          echo "==> Locking API CORS origins to: ${WEB_URL},http://localhost:3000"
+          echo "==> Locking API CORS origins to: ${WEB_URL},https://tp-web-1023298632546.us-central1.run.app,http://localhost:3000"
           gcloud run services update tp-api \
             --project "${PROJECT_ID}" \
             --region "${REGION}" \
-            --update-env-vars "^@^ALLOWED_ORIGINS=${WEB_URL},http://localhost:3000"
+            --update-env-vars "^@^ALLOWED_ORIGINS=${WEB_URL},https://tp-web-1023298632546.us-central1.run.app,http://localhost:3000"
 
       # -------------------------------------------------------------
       # 5. STEP SUMMARY
