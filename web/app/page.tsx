@@ -2,7 +2,6 @@
 
 import {
   GoogleAuthProvider,
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -64,7 +63,6 @@ export default function AtelierStudio() {
   const [authDeniedReason, setAuthDeniedReason] = useState<string | null>(null);
 
   // Email / Password Form State
-  const [authMode, setAuthMode] = useState<"signin" | "signup">("signin");
   const [emailInput, setEmailInput] = useState("");
   const [passwordInput, setPasswordInput] = useState("");
   const [authSubmitting, setAuthSubmitting] = useState(false);
@@ -345,27 +343,20 @@ export default function AtelierStudio() {
     setError(null);
     setAuthSubmitting(true);
     try {
-      if (authMode === "signin") {
-        await signInWithEmailAndPassword(auth, emailInput.trim(), passwordInput);
-      } else {
-        await createUserWithEmailAndPassword(auth, emailInput.trim(), passwordInput);
-      }
+      await signInWithEmailAndPassword(auth, emailInput.trim(), passwordInput);
     } catch (err: unknown) {
       const e = err as { code?: string; message?: string };
       switch (e.code) {
         case "auth/user-not-found":
         case "auth/wrong-password":
         case "auth/invalid-credential":
-          setError("Incorrect email or password. If you are new to the atelier, switch to 'Create Account'.");
-          break;
-        case "auth/email-already-in-use":
-          setError("An account with this email already exists. Please switch to 'Sign In'.");
-          break;
-        case "auth/weak-password":
-          setError("Password should be at least 6 characters long.");
+          setError("Incorrect email or password. Please verify your credentials or contact an administrator.");
           break;
         case "auth/invalid-email":
           setError("Please enter a valid email address.");
+          break;
+        case "auth/too-many-requests":
+          setError("Too many unsuccessful login attempts. Please try again later.");
           break;
         default:
           setError(e.message || "Authentication failed. Please verify your credentials.");
@@ -436,29 +427,6 @@ export default function AtelierStudio() {
 
           {/* Email / Password Form */}
           <form className="auth-form" onSubmit={handleEmailAuth}>
-            <div className="auth-mode-tabs">
-              <button
-                type="button"
-                className={`auth-mode-tab ${authMode === "signin" ? "active" : ""}`}
-                onClick={() => {
-                  setAuthMode("signin");
-                  setError(null);
-                }}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                className={`auth-mode-tab ${authMode === "signup" ? "active" : ""}`}
-                onClick={() => {
-                  setAuthMode("signup");
-                  setError(null);
-                }}
-              >
-                Create Account
-              </button>
-            </div>
-
             <div className="auth-field">
               <label htmlFor="auth-email">Email Address</label>
               <input
@@ -482,7 +450,7 @@ export default function AtelierStudio() {
                 placeholder="••••••••"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                autoComplete={authMode === "signin" ? "current-password" : "new-password"}
+                autoComplete="current-password"
                 required
               />
             </div>
@@ -492,11 +460,7 @@ export default function AtelierStudio() {
               className="auth-submit-btn"
               disabled={authSubmitting}
             >
-              {authSubmitting
-                ? "Verifying Atelier Access..."
-                : authMode === "signin"
-                ? "Enter Atelier Studio"
-                : "Create Atelier Account"}
+              {authSubmitting ? "Verifying Atelier Access..." : "Enter Atelier Studio"}
             </button>
           </form>
 
@@ -546,10 +510,7 @@ export default function AtelierStudio() {
             <div className="atelier-restricted-instruction">
               {authDeniedReason || "This account does not have active designer or administrator privileges."}
               <br />
-              Ask an atelier administrator to authorize this email:
-            </div>
-            <div className="atelier-cli-snippet">
-              python api/scripts/manage_allowed_users.py add {user.email || "email@example.com"} designer
+              Please contact an atelier administrator to request access for this account.
             </div>
           </div>
 

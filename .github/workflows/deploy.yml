@@ -111,7 +111,7 @@ jobs:
           ENV_VARS="${ENV_VARS},MODEL_LIVE=${{ vars.MODEL_LIVE || 'gemini-3.8-live' }}"
           ENV_VARS="${ENV_VARS},DEMO_MODE=${{ vars.DEMO_MODE || 'off' }}"
           ENV_VARS="${ENV_VARS},DEMO_TIMEOUT_S=${{ vars.DEMO_TIMEOUT_S || '25' }}"
-          ENV_VARS="${ENV_VARS},ALLOWED_ORIGINS=http://localhost:3000"
+          ENV_VARS="${ENV_VARS},ALLOWED_ORIGINS=https://threadandpixel.shop,https://www.threadandpixel.shop,http://localhost:3000"
 
           gcloud run deploy tp-api \
             --source ./api \
