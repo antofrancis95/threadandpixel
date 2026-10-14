@@ -20,6 +20,23 @@ def generate(prompt: str) -> tuple[bytes, str]:
     return extract_image(response)
 
 
+def generate_from_reference(reference_image: bytes, reference_mime: str, prompt: str) -> tuple[bytes, str]:
+    """Generates an editorial garment image guided by a reference design sketch or photo."""
+    try:
+        response = imaging().models.generate_content(
+            model=settings.model_image,
+            contents=[
+                types.Part.from_bytes(data=reference_image, mime_type=reference_mime),
+                prompt,
+            ],
+            config=_PORTRAIT_CONFIG,
+        )
+        return extract_image(response)
+    except Exception:
+        # Fallback to pure high-fashion prompt synthesis if reference injection fails
+        return generate(prompt)
+
+
 def edit(image: bytes, mime: str, instruction: str) -> tuple[bytes, str]:
     response = imaging().models.generate_content(
         model=settings.model_image,

@@ -20,10 +20,12 @@ export type Design = {
   flats_url: string | null;
   tryon_url: string | null;
   runway_url: string | null;
+  reference_image_url?: string | null;
+  occasion?: string | null;
   has_vto_portrait?: boolean;
   reply: string | null;
   transcript: string | null;
-  suggested_action?: "none" | "fitting" | "measurements" | "runway" | "commission" | "gender" | "consultation";
+  suggested_action?: "none" | "fitting" | "measurements" | "runway" | "commission" | "gender" | "consultation" | "design_upload" | "occasion_stylist";
   messages?: ChatMessage[];
   is_off_topic?: boolean;
 };
@@ -38,7 +40,17 @@ export type DesignSummary = {
   created_at: string;
 };
 
-export type AtelierAction = "fitting" | "measurements" | "flats" | "runway" | "commission" | "gender" | "consultation" | null;
+export type AtelierAction =
+  | "fitting"
+  | "measurements"
+  | "flats"
+  | "runway"
+  | "commission"
+  | "gender"
+  | "consultation"
+  | "design_upload"
+  | "occasion_stylist"
+  | null;
 
 export type ChatMessage = { role: "user" | "model"; text: string; live?: boolean };
 

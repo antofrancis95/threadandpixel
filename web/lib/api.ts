@@ -28,6 +28,33 @@ export function createApi(baseUrl: string, auth: Auth) {
 
   return {
     createDesign: (msg: MessageInput) => post<Design>("/designs", msg),
+    createDesignFromImage: (file: File, text?: string, gender?: string, size?: string) => {
+      const form = new FormData();
+      form.append("file", file);
+      if (text) form.append("text", text);
+      if (gender) form.append("gender", gender);
+      if (size) form.append("size", size);
+      return request<Design>("/designs/from-image", { method: "POST", body: form });
+    },
+    createDesignForOccasion: (params: {
+      occasion: string;
+      file?: File | null;
+      uploadId?: string | null;
+      preferences?: string;
+      gender?: string;
+      size?: string;
+      consent?: boolean;
+    }) => {
+      const form = new FormData();
+      form.append("occasion", params.occasion);
+      form.append("consent", params.consent !== false ? "true" : "false");
+      if (params.file) form.append("file", params.file);
+      if (params.uploadId) form.append("upload_id", params.uploadId);
+      if (params.preferences) form.append("preferences", params.preferences);
+      if (params.gender) form.append("gender", params.gender);
+      if (params.size) form.append("size", params.size);
+      return request<Design>("/designs/for-occasion", { method: "POST", body: form });
+    },
     listDesigns: () => request<DesignSummary[]>("/designs"),
     getDesign: (id: string) => request<Design>(`/designs/${encodeURIComponent(id)}`),
     sendMessage: (id: string, msg: MessageInput) => post<Design>(`/designs/${encodeURIComponent(id)}/messages`, msg),

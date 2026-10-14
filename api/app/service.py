@@ -1,14 +1,17 @@
+import io
 import logging
+import uuid
 
 from fastapi import HTTPException, status
 from google.cloud import firestore
+from PIL import Image, UnidentifiedImageError
 
 from . import demo, storage
 from .ai import designer, runway, tailor, tryon
 from .auth import User
 from .clients import db
 from .config import settings
-from .models import DesignSpec, MessageIn, TailorTurn
+from .models import DesignSpec, MessageIn, PhotoCheck, TailorTurn
 
 log = logging.getLogger(__name__)
 
@@ -68,6 +71,8 @@ def design_response(
         "flats_url": url("flats_path"),
         "tryon_url": url("tryon_path"),
         "runway_url": url("runway_path"),
+        "reference_image_url": url("reference_image_path"),
+        "occasion": data.get("occasion"),
         "has_vto_portrait": bool(data.get("person_upload_path")),
         "reply": reply,
         "transcript": transcript,
@@ -141,6 +146,210 @@ def create_design(user: User, msg: MessageIn) -> dict:
         "flats_path": flats_path,
         "tryon_path": None,
         "runway_path": None,
+        "messages": msgs,
+        "created_at": firestore.SERVER_TIMESTAMP,
+        "updated_at": firestore.SERVER_TIMESTAMP,
+    }
+    ref.set(data)
+    save_turn(ref, turn.user_transcript, turn.reply_to_user)
+    return design_response(ref.id, data, turn.reply_to_user, turn.user_transcript, turn.suggested_action)
+
+
+def create_design_from_image(
+    user: User,
+    image_bytes: bytes,
+    mime: str,
+    text: str | None = None,
+    gender: str | None = None,
+    size: str | None = None,
+) -> dict:
+    """Generates an outfit based on an uploaded design image / sketch."""
+    turn = demo.model(
+        "tailor-design-image",
+        lambda: tailor.converse_with_design_image(
+            image_bytes, mime, text=text, explicit_gender=gender, size=size
+        ),
+        TailorTurn,
+    )
+    ref = db().collection("designs").document()
+    msgs = [
+        {"role": "user", "text": turn.user_transcript},
+        {"role": "model", "text": turn.reply_to_user},
+    ]
+    ref_ext = EXT.get(mime, "jpg")
+    ref_path = storage.upload(f"designs/{ref.id}/reference.{ref_ext}", image_bytes, mime)
+
+    image, out_mime = demo.image(
+        "design-create",
+        lambda: designer.generate_from_reference(image_bytes, mime, turn.image_prompt),
+    )
+    path = add_version(ref, 1, image, out_mime, turn.image_prompt)
+
+    effective_size = turn.spec.size or size or "M"
+    flats_path = None
+    try:
+        flats_image, flats_mime = demo.image(
+            "flats",
+            lambda: designer.technical_flats(image, out_mime, turn.spec, size=effective_size),
+        )
+        flats_path = storage.upload(
+            f"designs/{ref.id}/flats-v1.{EXT.get(flats_mime, 'png')}",
+            flats_image,
+            flats_mime,
+        )
+    except Exception as exc:
+        log.warning("Auto drafting flats for image design failed: %s", exc)
+
+    data = {
+        "uid": user.uid,
+        "spec": turn.spec.model_dump(),
+        "image_prompt": turn.image_prompt,
+        "suggested_action": turn.suggested_action,
+        "current_version": 1,
+        "current_image_path": path,
+        "reference_image_path": ref_path,
+        "flats_path": flats_path,
+        "tryon_path": None,
+        "runway_path": None,
+        "messages": msgs,
+        "created_at": firestore.SERVER_TIMESTAMP,
+        "updated_at": firestore.SERVER_TIMESTAMP,
+    }
+    ref.set(data)
+    save_turn(ref, turn.user_transcript, turn.reply_to_user)
+    return design_response(ref.id, data, turn.reply_to_user, turn.user_transcript, turn.suggested_action)
+
+
+def create_design_for_occasion(
+    user: User,
+    occasion: str,
+    person_bytes: bytes | None = None,
+    person_mime: str | None = None,
+    upload_id: str | None = None,
+    preferences: str | None = None,
+    gender: str | None = None,
+    size: str | None = None,
+) -> dict:
+    """Designs an outfit for a specific occasion tailored to the client's photo and drapes it onto them."""
+    resolved_person_bytes = None
+    resolved_person_mime = "image/jpeg"
+    resolved_person_path = None
+    resolved_upload_id = upload_id
+
+    if person_bytes:
+        try:
+            img = Image.open(io.BytesIO(person_bytes))
+            if img.format not in {"JPEG", "PNG", "WEBP"}:
+                raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Use a JPEG, PNG or WebP image.")
+            img = img.convert("RGB")
+        except (UnidentifiedImageError, OSError):
+            raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "File is not a valid image.")
+
+        img.thumbnail((2048, 2048))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=92)
+        clean = buf.getvalue()
+
+        check = demo.model("photo-check", lambda: tryon.check_person_photo(clean, "image/jpeg"), PhotoCheck)
+        if check.appears_minor or check.unsafe_content or not check.single_person_full_body:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Photo not suitable for try-on: {check.reason}")
+
+        resolved_upload_id = uuid.uuid4().hex
+        resolved_person_path = storage.upload(f"uploads/{user.uid}/{resolved_upload_id}.jpg", clean, "image/jpeg")
+        db().collection("uploads").document(resolved_upload_id).set(
+            {"uid": user.uid, "path": resolved_person_path, "consent_at": firestore.SERVER_TIMESTAMP}
+        )
+        db().collection("users").document(user.uid).set(
+            {"last_upload_id": resolved_upload_id, "last_person_path": resolved_person_path},
+            merge=True,
+        )
+        resolved_person_bytes = clean
+        resolved_person_mime = "image/jpeg"
+    elif upload_id:
+        snap = db().collection("uploads").document(upload_id).get()
+        if not snap.exists or snap.get("uid") != user.uid:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Upload not found")
+        resolved_person_path = snap.get("path")
+        resolved_person_bytes, resolved_person_mime = storage.download(resolved_person_path)
+    else:
+        u_snap = db().collection("users").document(user.uid).get()
+        if u_snap.exists and u_snap.get("last_person_path"):
+            resolved_person_path = u_snap.get("last_person_path")
+            resolved_upload_id = u_snap.get("last_upload_id")
+            resolved_person_bytes, resolved_person_mime = storage.download(resolved_person_path)
+        else:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Please upload a photo of yourself so the Couturier can design and drape your occasion outfit.",
+            )
+
+    turn = demo.model(
+        "tailor-occasion",
+        lambda: tailor.converse_for_occasion(
+            resolved_person_bytes,
+            resolved_person_mime,
+            occasion=occasion,
+            preferences=preferences,
+            explicit_gender=gender,
+            size=size,
+        ),
+        TailorTurn,
+    )
+
+    ref = db().collection("designs").document()
+    msgs = [
+        {"role": "user", "text": turn.user_transcript},
+        {"role": "model", "text": turn.reply_to_user},
+    ]
+
+    image, out_mime = demo.image("design-create", lambda: designer.generate(turn.image_prompt))
+    path = add_version(ref, 1, image, out_mime, turn.image_prompt)
+
+    # Automatically perform virtual try-on on the person photo
+    tryon_path = None
+    try:
+        tryon_bytes = demo.blob(
+            "tryon",
+            lambda: tryon.try_on(resolved_person_bytes, resolved_person_mime, image, out_mime),
+            "image/jpeg",
+        )
+        tryon_path = storage.upload(
+            f"uploads/{user.uid}/tryon-{ref.id}-v1.jpg",
+            tryon_bytes,
+            "image/jpeg",
+        )
+    except Exception as exc:
+        log.warning("Auto try-on for occasion outfit failed: %s", exc)
+
+    # Automatically draft flats with measurements
+    effective_size = turn.spec.size or size or "M"
+    flats_path = None
+    try:
+        flats_image, flats_mime = demo.image(
+            "flats",
+            lambda: designer.technical_flats(image, out_mime, turn.spec, size=effective_size),
+        )
+        flats_path = storage.upload(
+            f"designs/{ref.id}/flats-v1.{EXT.get(flats_mime, 'png')}",
+            flats_image,
+            flats_mime,
+        )
+    except Exception as exc:
+        log.warning("Auto drafting flats for occasion outfit failed: %s", exc)
+
+    data = {
+        "uid": user.uid,
+        "spec": turn.spec.model_dump(),
+        "image_prompt": turn.image_prompt,
+        "suggested_action": turn.suggested_action,
+        "current_version": 1,
+        "current_image_path": path,
+        "flats_path": flats_path,
+        "tryon_path": tryon_path,
+        "runway_path": None,
+        "occasion": occasion,
+        "person_upload_path": resolved_person_path,
+        "person_upload_id": resolved_upload_id,
         "messages": msgs,
         "created_at": firestore.SERVER_TIMESTAMP,
         "updated_at": firestore.SERVER_TIMESTAMP,

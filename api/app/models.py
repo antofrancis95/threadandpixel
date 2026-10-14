@@ -33,7 +33,9 @@ class TailorTurn(BaseModel):
     image_prompt: str
     edit_instruction: str
     reply_to_user: str
-    suggested_action: Literal["none", "fitting", "measurements", "runway", "commission", "gender", "consultation"] = "none"
+    suggested_action: Literal[
+        "none", "fitting", "measurements", "runway", "commission", "gender", "consultation", "design_upload", "occasion_stylist"
+    ] = "none"
     ready_to_sketch: bool = True
     is_off_topic: bool = False
 
@@ -59,6 +61,9 @@ class MessageIn(BaseModel):
     text: str | None = Field(default=None, max_length=2000)
     audio_b64: str | None = Field(default=None, max_length=14_000_000)
     audio_mime: AudioMime = "audio/webm"
+    design_image_b64: str | None = Field(default=None, max_length=14_000_000)
+    design_image_mime: str = "image/jpeg"
+    occasion: str | None = Field(default=None, max_length=500)
     gender: Gender | None = None
     size: Size | None = None
     fit: str | None = None

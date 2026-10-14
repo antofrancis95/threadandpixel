@@ -43,15 +43,30 @@ Your mission:
      * The client explicitly says to start sketching, go ahead and design, or make the creative choices for them, OR
      * This is a revision/edit of an existing sketched design (current design spec already exists with version >= 1).
 
-3. IN YOUR REPLY (when sketching or ready):
+3. DESIGN INSPIRATION IMAGE UPLOAD & OCCASION BESPOKE PATHWAYS:
+   - WHEN A DESIGN IMAGE / SKETCH IS PROVIDED:
+     * Deeply inspect the uploaded image: identify the garment silhouette, neckline, bodice structure, sleeves, hemline, tailoring details, pattern, embellishments, and color palette.
+     * Select certified atelier fabrics that realize the visual concept in true haute couture quality.
+     * Formulate an exact DesignSpec and a luxury image_prompt on an invisible mannequin with pristine studio lighting and seamless alabaster background.
+     * Set ready_to_sketch = true.
+     * In reply_to_user: warmly praise their design inspiration (1-2 short sentences), explain the bespoke fabrics and silhouette choices you have sculpted based on their uploaded design, and invite them to view the drape and architectural technical flats.
+   - WHEN AN OCCASION IS SPECIFIED (AND/OR CLIENT PORTRAIT PROVIDED):
+     * Deeply analyze the occasion context (gala, wedding, cocktail party, red carpet, etc.) and the client's photo (physique, skin undertone, hair, demeanor, gender).
+     * Concoct the optimal bespoke silhouette, fabric, and color palette specifically suited for this individual and the occasion's dress code and glamour.
+     * Set ready_to_sketch = true.
+     * In reply_to_user: warmly celebrate their upcoming occasion, explain why this silhouette and fabric was designed for them and for the event, and inform them that the design has been draped directly onto their photo in the Virtual Fitting Room!
+
+4. IN YOUR REPLY (when sketching or ready):
    - Praise the client's creative choice (1 short sentence), describe the drape/materials, and proactively invite them to the next bespoke milestone:
      * If size is provided, highlight that you have sculpted the piece and drafted technical flats with exact measurements for their size.
      * If new design without portrait on file, invite them to step into the virtual fitting room OR share their measurements for precision tailoring.
      * If they tweaked an existing design and their fitting portrait is already uploaded, confirm that the new silhouette drape is reflected in the salon mirror (never ask them to upload a photo again).
      * If they tweaked an existing design and have not uploaded a portrait yet, invite them to view the new drape in the fitting room.
 
-4. CHOOSE SUGGESTED_ACTION:
+5. CHOOSE SUGGESTED_ACTION:
    - "consultation": if asking for color, fit, fabric, or size before sketching (when ready_to_sketch = false).
+   - "design_upload": if the client mentions having a design in mind, a sketch, or wanting to upload an image.
+   - "occasion_stylist": if the client mentions an occasion or event and needs an outfit designed for it with their photo.
    - "gender": if in text chat and you are prompting the client to choose gentleman (menswear) or lady (womenswear).
    - "fitting": ONLY if client has not yet uploaded a photo and you are inviting them to upload one. If their portrait is already on file, do NOT choose "fitting".
    - "measurements": if suggesting they capture bust/waist/hip measurements.
@@ -59,7 +74,7 @@ Your mission:
    - "commission": if they are ready for pricing and ordering.
    - "none": if just conversing or asking a clarifying question.
 
-5. OFF-TOPIC & BACKGROUND VOICE CONVERSATION IDENTIFICATION & REDIRECTION (CRITICAL):
+6. OFF-TOPIC & BACKGROUND VOICE CONVERSATION IDENTIFICATION & REDIRECTION (CRITICAL):
    - You are EXCLUSIVELY The Master Couturier at Thread & Pixel haute couture atelier.
    - You NEVER answer questions or provide advice on non-fashion topics (such as medical insurance, healthcare questions, doctors, hospitals, insurance forms/claims, legal matters, taxes, finance, cooking, vehicles, coding, homework, personal errands).
    - VOICE MODE BACKGROUND & FOREGROUND AUDIO DETECTION:
@@ -120,12 +135,18 @@ def _user_parts(msg: MessageIn, sanitized_text: str | None) -> list[types.Part]:
         except ValueError as exc:
             raise AIError("Invalid audio payload.") from exc
         parts.append(types.Part.from_bytes(data=audio, mime_type=msg.audio_mime))
+    if msg.design_image_b64:
+        try:
+            design_img = base64.b64decode(msg.design_image_b64, validate=True)
+        except ValueError as exc:
+            raise AIError("Invalid design image payload.") from exc
+        parts.append(types.Part.from_bytes(data=design_img, mime_type=msg.design_image_mime or "image/jpeg"))
     if sanitized_text:
         parts.append(types.Part.from_text(text=sanitized_text))
     elif msg.text:
         parts.append(types.Part.from_text(text=msg.text))
     if not parts:
-        raise AIError("Provide text or audio.")
+        raise AIError("Provide text, audio, or a design image.")
     return parts
 
 
@@ -152,6 +173,16 @@ def converse(
         if explicit_gender
         else "In voice mode: deduce gender from vocal acoustics. In text chat: prompt for gender if not specified."
     )
+    occasion_directive = (
+        f"Client specified event/occasion: {msg.occasion}. Formulate a bespoke haute couture design specifically styled for this event."
+        if msg.occasion
+        else ""
+    )
+    design_image_directive = (
+        "The client has provided a design inspiration image. Inspect its silhouette, neckline, cut, and details to formulate the bespoke spec and luxury image prompt."
+        if msg.design_image_b64
+        else ""
+    )
     offtopic_guard_note = (
         "DOMAIN BOUNDARY: You are strictly The Master Couturier at Thread & Pixel atelier. "
         "If the client's voice audio or text contains off-topic conversation (medical insurance, health, legal, finance, "
@@ -159,10 +190,11 @@ def converse(
         "suggested_action='none', do NOT answer or advise on the off-topic topic, and warmly guide the client back "
         "to their bespoke atelier design in their spoken language."
     )
+    directives = " ".join(d for d in [vto_status, gender_directive, occasion_directive, design_image_directive, offtopic_guard_note] if d)
     context = (
-        f"Current design spec: {current.model_dump_json()}. Fitting status: {vto_status}. {gender_directive}. {offtopic_guard_note}"
+        f"Current design spec: {current.model_dump_json()}. {directives}"
         if current
-        else f"There is no design yet; create a new one. {gender_directive}. {offtopic_guard_note}"
+        else f"There is no design yet; create a new one. {directives}"
     )
     contents.append(
         types.Content(
@@ -191,4 +223,90 @@ def converse(
 
     # 2. ADK Output Guardrail: Brand notification, fabric whitelist, off-topic deflection & next-action assignment
     turn = apply_output_guardrail(turn, brand_notice=brand_notice, has_vto=has_vto, current_spec=current)
+    return turn
+
+
+def converse_with_design_image(
+    image: bytes,
+    mime: str,
+    text: str | None = None,
+    explicit_gender: str | None = None,
+    size: str | None = None,
+) -> TailorTurn:
+    """Specialized Couturier consultation directly analyzing an uploaded design image / sketch."""
+    sanitized_text, brand_notice = sanitize_input_text(text or "")
+    prompt = (
+        "The VIP client has uploaded an image of a design, sketch, or garment reference to generate a bespoke outfit based on it. "
+        "Actively inspect the uploaded image: identify the garment silhouette, neckline, bodice structure, sleeves, hemline, "
+        "tailoring details, drapery, and color palette. "
+        f"{f'Client target gender: {explicit_gender}. ' if explicit_gender else ''}"
+        f"{f'Client requested size: {size}. ' if size else ''}"
+        f"{f'Client design notes: {sanitized_text}. ' if sanitized_text else ''}"
+        "Map this visual concept into certified atelier fabrics and craft an exact DesignSpec and luxury editorial image_prompt "
+        "on an invisible mannequin with pristine studio lighting and seamless alabaster background. "
+        "Set ready_to_sketch = true. In reply_to_user, warmly praise their creative concept, explain the bespoke fabrics and "
+        "silhouette choices you formulated based on their uploaded design, and invite them to view the drape and architectural technical flats."
+    )
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_bytes(data=image, mime_type=mime), types.Part.from_text(text=prompt)],
+        )
+    ]
+    response = gemini().models.generate_content(
+        model=settings.model_flash,
+        contents=contents,
+        config=json_config(TailorTurn, SYSTEM_PROMPT),
+    )
+    turn = parse_structured(response, TailorTurn)
+    turn.user_transcript = text or "Bespoke design generated from uploaded design inspiration."
+    turn.ready_to_sketch = True
+    if explicit_gender and explicit_gender in ("menswear", "womenswear", "unisex"):
+        turn.spec.gender = explicit_gender
+    if size:
+        turn.spec.size = size
+    turn = apply_output_guardrail(turn, brand_notice=brand_notice, current_spec=None)
+    return turn
+
+
+def converse_for_occasion(
+    person: bytes,
+    person_mime: str,
+    occasion: str,
+    preferences: str | None = None,
+    explicit_gender: str | None = None,
+    size: str | None = None,
+) -> TailorTurn:
+    """Specialized Couturier consultation designing an outfit for an occasion tailored to the client's photo."""
+    sanitized_pref, brand_notice = sanitize_input_text(preferences or "")
+    prompt = (
+        f"The VIP client has provided their portrait/photo and specified an occasion: '{occasion}'. "
+        "Analyze the client's photo (their frame, skin undertone, posture, hair, visual gender/demeanor) and the occasion's dress code and glamour. "
+        f"{f'Client target gender: {explicit_gender}. ' if explicit_gender else ''}"
+        f"{f'Client requested size: {size}. ' if size else ''}"
+        f"{f'Client styling preferences: {sanitized_pref}. ' if sanitized_pref else ''}"
+        f"Conceive the ultimate bespoke haute couture outfit uniquely tailored for this client to shine at '{occasion}'. "
+        "Set ready_to_sketch = true. In reply_to_user, warmly celebrate their occasion, explain the couture rationale behind this silhouette "
+        "and fabric choice for their frame, and inform them that the bespoke outfit has also been draped directly onto their photo in the Virtual Fitting Room!"
+    )
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_bytes(data=person, mime_type=person_mime), types.Part.from_text(text=prompt)],
+        )
+    ]
+    response = gemini().models.generate_content(
+        model=settings.model_flash,
+        contents=contents,
+        config=json_config(TailorTurn, SYSTEM_PROMPT),
+    )
+    turn = parse_structured(response, TailorTurn)
+    pref_text = f" ({preferences})" if preferences else ""
+    turn.user_transcript = f"Bespoke outfit for {occasion}{pref_text} based on uploaded photo."
+    turn.ready_to_sketch = True
+    if explicit_gender and explicit_gender in ("menswear", "womenswear", "unisex"):
+        turn.spec.gender = explicit_gender
+    if size:
+        turn.spec.size = size
+    turn = apply_output_guardrail(turn, brand_notice=brand_notice, has_vto=True, current_spec=None)
     return turn

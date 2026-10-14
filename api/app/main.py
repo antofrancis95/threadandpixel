@@ -18,6 +18,8 @@ from .service import (
     EXT,
     continue_design,
     create_design,
+    create_design_for_occasion,
+    create_design_from_image,
     design_response,
     generate_flats_service,
     history,
@@ -113,6 +115,64 @@ def list_designs(user: User = Depends(current_user)):
 @app.post("/designs")
 def post_design(body: MessageIn, user: User = Depends(current_user)):
     return create_design(user, body)
+
+
+@app.post("/designs/from-image")
+async def post_design_from_image(
+    file: UploadFile = File(...),
+    text: str | None = Form(default=None),
+    gender: str | None = Form(default=None),
+    size: str | None = Form(default=None),
+    user: User = Depends(current_user),
+):
+    raw = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Image must be 10 MB or smaller.")
+    try:
+        img = Image.open(io.BytesIO(raw))
+        if img.format not in {"JPEG", "PNG", "WEBP"}:
+            raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Use a JPEG, PNG or WebP image.")
+        img = img.convert("RGB")
+    except (UnidentifiedImageError, OSError):
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "File is not a valid image.")
+
+    img.thumbnail((2048, 2048))
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=92)
+    clean = buf.getvalue()
+    return create_design_from_image(user, clean, "image/jpeg", text=text, gender=gender, size=size)
+
+
+@app.post("/designs/for-occasion")
+async def post_design_for_occasion(
+    occasion: str = Form(...),
+    file: UploadFile | None = File(default=None),
+    upload_id: str | None = Form(default=None),
+    preferences: str | None = Form(default=None),
+    gender: str | None = Form(default=None),
+    size: str | None = Form(default=None),
+    consent: bool = Form(default=True),
+    user: User = Depends(current_user),
+):
+    if not consent:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Consent is required to process your photo.")
+    person_bytes = None
+    if file is not None and file.filename:
+        raw = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(raw) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Image must be 10 MB or smaller.")
+        person_bytes = raw
+
+    return create_design_for_occasion(
+        user=user,
+        occasion=occasion,
+        person_bytes=person_bytes,
+        person_mime="image/jpeg" if person_bytes else None,
+        upload_id=upload_id,
+        preferences=preferences,
+        gender=gender,
+        size=size,
+    )
 
 
 @app.get("/designs/{design_id}")

@@ -41,7 +41,7 @@ type ServerEvent =
   | { type: "tool_start"; tool: string; request?: string }
   | { type: "design"; design: Design }
   | { type: "flats"; flats_url: string }
-  | { type: "widget"; widget: AtelierAction }
+  | { type: "widget"; widget: AtelierAction; occasion?: string }
   | { type: "runway_started"; job: any }
   | { type: "error"; message: string };
 
@@ -65,7 +65,7 @@ export function LiveVoice({
   onError: (message: string) => void;
   onVoiceActivity?: (active: boolean, volume: number) => void;
   onFlats?: (flatsUrl: string) => void;
-  onWidget?: (widget: AtelierAction) => void;
+  onWidget?: (widget: AtelierAction, occasion?: string) => void;
   onRunwayStarted?: (job: any) => void;
   onDesigning?: () => void;
   onUserSpeech?: () => void;
@@ -240,7 +240,7 @@ export function LiveVoice({
           setStatus("listening");
           break;
         case "widget":
-          handlers.current.onWidget?.(msg.widget);
+          handlers.current.onWidget?.(msg.widget, msg.occasion);
           setStatus("listening");
           break;
         case "runway_started":

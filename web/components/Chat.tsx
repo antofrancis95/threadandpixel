@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
+  CameraIcon,
   ClipboardIcon,
   FilmIcon,
+  ImageIcon,
   MannequinIcon,
   MirrorIcon,
+  PartyIcon,
   ScissorsIcon,
   SparkleIcon,
 } from "@/components/icons";
@@ -76,12 +79,28 @@ export function Chat({
                 <SparkleIcon size={12} style={{ color: "var(--gold)" }} /> Master Couturier
               </span>
               <p style={{ margin: 0 }}>
-                Welcome to the Thread &amp; Pixel atelier. Describe your dream silhouette, or select whether we are tailoring for a gentleman or lady:
+                Welcome to the Thread &amp; Pixel atelier. What would you like to design today, or do you have a design in mind? You can upload a design sketch to generate an outfit from it, tell me your occasion and share your photo for a bespoke creation, or describe your dream silhouette:
               </p>
-              <div className="action-chips" style={{ marginTop: "0.8rem", display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
+              <div className="action-chips" style={{ marginTop: "0.85rem", display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
                 <button
                   type="button"
                   className="chip-btn highlight"
+                  onClick={() => onSelectWidget("design_upload")}
+                >
+                  <ImageIcon size={13} style={{ color: "var(--gold)" }} />
+                  <span>“Upload Design Image”</span>
+                </button>
+                <button
+                  type="button"
+                  className="chip-btn highlight"
+                  onClick={() => onSelectWidget("occasion_stylist")}
+                >
+                  <PartyIcon size={13} style={{ color: "var(--gold)" }} />
+                  <span>“Design for an Occasion”</span>
+                </button>
+                <button
+                  type="button"
+                  className="chip-btn"
                   onClick={() => {
                     onSelectWidget(null);
                     onSend({ text: "A bespoke midnight navy wool-suiting tuxedo with satin peak lapels for a gentleman." });
@@ -92,7 +111,7 @@ export function Chat({
                 </button>
                 <button
                   type="button"
-                  className="chip-btn highlight"
+                  className="chip-btn"
                   onClick={() => {
                     onSelectWidget(null);
                     onSend({ text: "A pastel blue chiffon maxi dress for an evening gala with sheer flutter sleeves for a lady." });
@@ -100,16 +119,6 @@ export function Chat({
                 >
                   <SparkleIcon size={12} />
                   <span>“Lady's pastel blue gown”</span>
-                </button>
-                <button
-                  type="button"
-                  className="chip-btn"
-                  onClick={() => {
-                    onSelectWidget(null);
-                    onSend({ text: "An ivory linen tailored jumpsuit with architectural lapels." });
-                  }}
-                >
-                  “Ivory tailored jumpsuit”
                 </button>
               </div>
             </div>
@@ -276,6 +285,26 @@ export function Chat({
                 {/* Proactive Action Chips below latest Couturier message */}
                 {isLatestModel && suggestedAction !== "consultation" && (
                   <div className="action-chips">
+                    {suggestedAction === "design_upload" && (
+                      <button
+                        type="button"
+                        className="chip-btn highlight"
+                        onClick={() => onSelectWidget(activeWidget === "design_upload" ? null : "design_upload")}
+                      >
+                        <ImageIcon size={13} />
+                        <span>Upload Design Image</span>
+                      </button>
+                    )}
+                    {suggestedAction === "occasion_stylist" && (
+                      <button
+                        type="button"
+                        className="chip-btn highlight"
+                        onClick={() => onSelectWidget(activeWidget === "occasion_stylist" ? null : "occasion_stylist")}
+                      >
+                        <PartyIcon size={13} />
+                        <span>Design for Occasion</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       className={`chip-btn ${suggestedAction === "measurements" ? "highlight" : ""}`}
@@ -292,6 +321,26 @@ export function Chat({
                       <MirrorIcon size={13} />
                       <span>Virtual Fitting Room</span>
                     </button>
+                    {!hasDesign && (
+                      <>
+                        <button
+                          type="button"
+                          className={`chip-btn ${suggestedAction === "design_upload" ? "highlight" : ""}`}
+                          onClick={() => onSelectWidget(activeWidget === "design_upload" ? null : "design_upload")}
+                        >
+                          <ImageIcon size={13} />
+                          <span>Upload Design Image</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`chip-btn ${suggestedAction === "occasion_stylist" ? "highlight" : ""}`}
+                          onClick={() => onSelectWidget(activeWidget === "occasion_stylist" ? null : "occasion_stylist")}
+                        >
+                          <PartyIcon size={13} />
+                          <span>Design for Occasion</span>
+                        </button>
+                      </>
+                    )}
                     {hasDesign && (
                       <>
                         <button
@@ -378,6 +427,26 @@ export function Chat({
             onSend({ audio_b64, audio_mime });
           }}
         />
+        <button
+          type="button"
+          className={`composer-icon-btn ${activeWidget === "design_upload" ? "active" : ""}`}
+          onClick={() => onSelectWidget(activeWidget === "design_upload" ? null : "design_upload")}
+          title="Upload a design image or sketch"
+          aria-label="Upload a design image"
+          disabled={busy}
+        >
+          <ImageIcon size={17} />
+        </button>
+        <button
+          type="button"
+          className={`composer-icon-btn ${activeWidget === "occasion_stylist" ? "active" : ""}`}
+          onClick={() => onSelectWidget(activeWidget === "occasion_stylist" ? null : "occasion_stylist")}
+          title="Design an outfit for your occasion"
+          aria-label="Design an outfit for your occasion"
+          disabled={busy}
+        >
+          <PartyIcon size={17} />
+        </button>
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}

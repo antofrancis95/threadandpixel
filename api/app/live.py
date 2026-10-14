@@ -57,7 +57,14 @@ MAX_FRAME_BYTES = 64 * 1024
 
 SYSTEM_PROMPT = """You are "The Master Couturier" at Thread & Pixel, speaking live with a VIP client by voice in our bespoke atelier salon.
 - Be warm, refined, concise and natural: 1-2 short spoken sentences per turn.
-- Help the customer describe their dream garment (silhouette, fabric, length, palette, occasion).
+- INITIAL ATELIER GREETING & BESPOKE CREATION PATHWAYS (CRITICAL):
+  * At the very start of the voice consultation, warmly greet the VIP client in your spoken voice (1-2 sentences):
+    Welcome them to Thread & Pixel, and ask what they would like to design today, or if they have a design in mind that they would like to upload.
+    Also inform them that if they have a special occasion, they can tell you the occasion and upload their photo, and you will design the perfect outfit tailored for them.
+  * THREE BESPOKE PATHWAYS:
+    1. Conversational Tailoring: If the client describes what they want to wear (silhouette, fabric, length, palette, fit), consult with them warmly and call update_design once basic preferences are gathered.
+    2. Upload a Design Image: If the client mentions having a design in mind, a sketch, an inspiration image, or asks to upload a design, immediately call open_design_upload to open the atelier uploader for them.
+    3. Occasion Styling & Fitting: If the client mentions an occasion (e.g. "I'm going to a wedding", "I need a gown for an evening gala", "cocktail party", "red carpet") or asks for an outfit designed for an event, immediately call open_occasion_stylist (passing occasion) so they can upload their photo and have an outfit designed and draped specifically for them.
 - ACOUSTIC GENDER RECOGNITION FROM VOICE: From the client's very first spoken voice input, actively listen to the acoustic pitch, vocal frequency, tone, and timbre of their spoken voice to recognize whether the speaker is a gentleman (male) or a lady (female).
 - DESIGN SILHOUETTE ACCORDINGLY:
   * If male: tailor menswear / masculine couture silhouettes (e.g., bespoke tailored suits, structured blazers, tuxedos, architectural jackets, dress trousers, polo shirts, masculine formalwear). Call update_design with gender='menswear'.
@@ -69,7 +76,7 @@ SYSTEM_PROMPT = """You are "The Master Couturier" at Thread & Pixel, speaking li
   * When off-topic conversation or background ambient chatter is captured:
     1. IDENTIFY IT IMMEDIATELY as off-topic or background chatter.
     2. NEVER SPIN OFF INTO THE OFF-TOPIC TOPIC: Under NO circumstances should you answer the off-topic query, give insurance/medical/legal advice or disclaimers, or discuss filling out forms!
-    3. NEVER call any tools (update_design, draft_flats, open_fitting, generate_runway) on off-topic chatter.
+    3. NEVER call any tools (update_design, draft_flats, open_fitting, generate_runway, open_design_upload, open_occasion_stylist) on off-topic chatter.
     4. STAY ON TOPIC AS THE MASTER COUTURIER: Speak 1 short, warm, elegant sentence in your spoken voice:
        - If ambient background speech: gently note that background chatter was overheard, and reaffirm you are standing by for their bespoke design.
        - If an off-topic question: politely clarify that you specialize strictly in bespoke fashion and cannot advise on outside topics.
@@ -89,9 +96,11 @@ SYSTEM_PROMPT = """You are "The Master Couturier" at Thread & Pixel, speaking li
   2. draft_flats: call this whenever the client asks for technical flats, 2D sketches, patterns, seam lines, or construction drawings.
   3. open_fitting: call this whenever the client wants to try on the garment, see it on themselves, or step into the virtual fitting room / salon mirror.
   4. generate_runway: call this whenever the client asks for a runway video, motion clip, fashion film, or runway demonstration.
+  5. open_design_upload: call this whenever the client mentions having a design in mind, a sketch, or asks to upload an image of a design to generate an outfit based on it.
+  6. open_occasion_stylist: call this whenever the client mentions an occasion (e.g. wedding, gala, party) or asks for an outfit designed for their occasion and wants to upload their photo.
 - VERBAL CONFIRMATION IN VOICE MODE (MANDATORY & IMMEDIATE):
   * When you trigger update_design or draft_flats, you will immediately receive the atelier sketching confirmation.
-  * In that exact turn, speak a warm, elegant verbal confirmation to the VIP client in your spoken voice: acknowledge their bespoke color, fit, fabric, and size choices and confirm you are now beginning the sketch and drafting technical flats with measurements (for example: "Splendid choice! Let me start sketching that tailored beige and white polo in Medium for you now.").
+  * In that exact turn, speak a warm, elegant verbal confirmation to the VIP client in your spoken voice: acknowledge their bespoke color, fit, fabric, and size choices and confirm you are now beginning the sketch and drafting technical flats with measurements.
   * NEVER silently trigger a tool without speaking your verbal confirmation out loud.
 - POST-TOOL SPOKEN FEEDBACK: Once the drape completes and returns with the atelier update, speak warmly in your own voice to tell the client what you have draped on the showcase board and that the technical flats with measurements are ready.
 - CRITICAL: NEVER tell the client you cannot generate a video, technical flats, or virtual fitting! You HAVE tools for all of them! Always call the corresponding tool immediately.
@@ -154,12 +163,51 @@ GENERATE_RUNWAY = types.FunctionDeclaration(
     ),
 )
 
+OPEN_DESIGN_UPLOAD = types.FunctionDeclaration(
+    name="open_design_upload",
+    description="Open the design inspiration upload drawer/card so the client can upload a design sketch, moodboard image, or garment concept to generate an outfit based on it.",
+    parameters=types.Schema(
+        type="OBJECT",
+        properties={},
+    ),
+)
+
+OPEN_OCCASION_STYLIST = types.FunctionDeclaration(
+    name="open_occasion_stylist",
+    description="Open the occasion stylist card so the client can specify their occasion (e.g. gala, wedding, cocktail party, red carpet) and upload their photo for an outfit designed and draped specifically for them.",
+    parameters=types.Schema(
+        type="OBJECT",
+        properties={
+            "occasion": types.Schema(
+                type="STRING",
+                description="The occasion mentioned by the client (e.g. 'black-tie gala', 'summer wedding guest', 'cocktail soirée', 'red carpet').",
+            ),
+            "gender": types.Schema(
+                type="STRING",
+                description="Target gender if recognized: 'menswear' or 'womenswear'.",
+                enum=["menswear", "womenswear", "unisex"],
+            ),
+        },
+    ),
+)
+
 
 def _live_config() -> types.LiveConnectConfig:
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
         system_instruction=SYSTEM_PROMPT,
-        tools=[types.Tool(function_declarations=[UPDATE_DESIGN, DRAFT_FLATS, OPEN_FITTING, GENERATE_RUNWAY])],
+        tools=[
+            types.Tool(
+                function_declarations=[
+                    UPDATE_DESIGN,
+                    DRAFT_FLATS,
+                    OPEN_FITTING,
+                    GENERATE_RUNWAY,
+                    OPEN_DESIGN_UPLOAD,
+                    OPEN_OCCASION_STYLIST,
+                ]
+            )
+        ],
         input_audio_transcription=types.AudioTranscriptionConfig(),
         output_audio_transcription=types.AudioTranscriptionConfig(),
     )
@@ -216,6 +264,19 @@ async def live_session(ws: WebSocket):
     try:
         async with live_client().aio.live.connect(model=settings.model_live, config=_live_config()) as session:
             await send({"type": "ready"})
+
+            # Prompt the Couturier to greet the VIP client proactively if starting a fresh session
+            if not state.get("design_id"):
+                greeting_prompt = (
+                    "[ATELIER INSTRUCTION]: The VIP client has just connected live to your private salon. "
+                    "Speak 1-2 warm, elegant, concise sentences in your spoken voice right now: "
+                    "Welcome them to Thread & Pixel! Ask what they would like to design today, or if they have a design in mind that they would like to upload. "
+                    "Also tell them that if they have a special occasion, they can tell you the occasion and upload their photo, and you will design the perfect bespoke outfit tailored for them."
+                )
+                try:
+                    await session.send_realtime_input(text=greeting_prompt)
+                except Exception as exc:
+                    log.warning("live: initial greeting failed: %s", exc)
 
             async def upstream():
                 while True:
@@ -394,6 +455,19 @@ async def live_session(ws: WebSocket):
                             feedback = "I have directed your 8-second cinematic runway showcase with luxury studio lighting. It is now filming for your showcase board."
                             await send({"type": "runway_started", "job": runway_job})
                             result = {"status": "started", "feedback": feedback, "job_id": runway_job["job_id"]}
+
+                    elif name == "open_design_upload":
+                        await send({"type": "tool_start", "tool": name})
+                        feedback = "I have opened the design studio uploader. Please share your sketch or reference image, and I will craft a bespoke silhouette based on it."
+                        await send({"type": "widget", "widget": "design_upload"})
+                        result = {"status": "opened", "feedback": feedback}
+
+                    elif name == "open_occasion_stylist":
+                        await send({"type": "tool_start", "tool": name})
+                        occasion = args.get("occasion", "")
+                        feedback = f"I have opened the occasion styling salon{f' for your {occasion}' if occasion else ''}. Please upload your photo so I can design and drape the ultimate creation for you."
+                        await send({"type": "widget", "widget": "occasion_stylist", "occasion": occasion})
+                        result = {"status": "opened", "feedback": feedback, "occasion": occasion}
 
                     else:
                         result = {"error": f"Unknown tool: {name}"}

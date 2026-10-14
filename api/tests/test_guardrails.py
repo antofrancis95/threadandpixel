@@ -221,4 +221,61 @@ def test_output_guardrail_intercepts_disclaimer_leak_in_malayalam():
     assert "വൈദ്യോപദേശമോ" not in guarded.reply_to_user
 
 
+def test_design_upload_and_occasion_actions_preserved():
+    turn_upload = TailorTurn(
+        user_transcript="I have a sketch I want to upload",
+        spec=DesignSpec(
+            garment_type="dress",
+            length="maxi",
+            sleeve="sleeveless",
+            fabric_id="silk-charmeuse",
+            color_hex="#E8D8C8",
+            closures=["zipper"],
+            embellishments=[],
+            lining=True,
+        ),
+        image_prompt="",
+        edit_instruction="",
+        reply_to_user="Please upload your sketch to generate an outfit based on it.",
+        suggested_action="design_upload",
+        ready_to_sketch=False,
+    )
+    guarded_upload = apply_output_guardrail(turn_upload)
+    assert guarded_upload.suggested_action == "design_upload"
 
+    turn_occasion = TailorTurn(
+        user_transcript="I have a summer wedding to attend",
+        spec=DesignSpec(
+            garment_type="dress",
+            length="midi",
+            sleeve="short",
+            fabric_id="silk-chiffon",
+            color_hex="#B0E0E6",
+            closures=["zipper"],
+            embellishments=[],
+            lining=True,
+        ),
+        image_prompt="",
+        edit_instruction="",
+        reply_to_user="A summer wedding is marvelous. Please share your photo and occasion details.",
+        suggested_action="occasion_stylist",
+        ready_to_sketch=False,
+    )
+    guarded_occasion = apply_output_guardrail(turn_occasion)
+    assert guarded_occasion.suggested_action == "occasion_stylist"
+
+
+def test_message_in_fields_support():
+    from app.models import MessageIn
+
+    msg = MessageIn(
+        text="A dress based on my uploaded sketch",
+        design_image_b64="iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        design_image_mime="image/png",
+        occasion="Black-tie Gala",
+        gender="womenswear",
+        size="M",
+    )
+    assert msg.occasion == "Black-tie Gala"
+    assert msg.design_image_mime == "image/png"
+    assert msg.size == "M"

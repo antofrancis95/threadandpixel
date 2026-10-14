@@ -17,9 +17,11 @@ import {
   ClipboardIcon,
   FilmIcon,
   GoogleIcon,
+  ImageIcon,
   LockIcon,
   MannequinIcon,
   MirrorIcon,
+  PartyIcon,
   PlusIcon,
   RefreshIcon,
   RulerIcon,
@@ -30,8 +32,10 @@ import {
 import { LiveVoice } from "@/components/LiveVoice";
 import { ChatSkeleton, ShowcaseSkeleton } from "@/components/skeletons";
 import { CommissionCard } from "@/components/widgets/CommissionCard";
+import { DesignUploadCard } from "@/components/widgets/DesignUploadCard";
 import { FittingRoomCard } from "@/components/widgets/FittingRoomCard";
 import { MeasurementCard } from "@/components/widgets/MeasurementCard";
+import { OccasionStylistCard } from "@/components/widgets/OccasionStylistCard";
 import { RunwayCard } from "@/components/widgets/RunwayCard";
 import type { MessageInput } from "@/lib/api";
 import { useApp } from "@/lib/providers";
@@ -76,6 +80,7 @@ export default function AtelierStudio() {
   // Interactive View States
   const [activeTab, setActiveTab] = useState<ShowcaseTab>("editorial");
   const [activeWidget, setActiveWidget] = useState<AtelierAction>(null);
+  const [prefilledOccasion, setPrefilledOccasion] = useState<string>("");
   const [quoteData, setQuoteData] = useState<QuoteResponse | null>(null);
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [tryonBusy, setTryonBusy] = useState(false);
@@ -324,12 +329,109 @@ export default function AtelierStudio() {
     }
   }
 
+  async function handleDesignUploadSubmit(
+    file: File,
+    notes?: string,
+    gender?: string,
+    size?: string,
+  ) {
+    setBusy(true);
+    setError(null);
+    setActiveWidget(null);
+    setMessages((m) => [
+      ...m,
+      {
+        role: "user",
+        text: notes?.trim()
+          ? `[Uploaded Design Reference: ${file.name}] ${notes}`
+          : `[Uploaded Design Reference: ${file.name}] Please tailor an haute couture outfit inspired by this design.`,
+      },
+    ]);
+    try {
+      const d = await api.createDesignFromImage(file, notes, gender, size);
+      localStorage.setItem(STORAGE_KEY, d.design_id);
+      setDesign(d);
+      setAssetErrors({});
+      setActiveTab("editorial");
+      setMessages((m) => [
+        ...m,
+        {
+          role: "model",
+          text:
+            d.reply ||
+            "I have translated your uploaded sketch into an haute couture silhouette capturing its lines, texture, and spirit.",
+        },
+      ]);
+      if (d.suggested_action && d.suggested_action !== "none") {
+        setActiveWidget(d.suggested_action as AtelierAction);
+      }
+      loadArchive();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleOccasionSubmit(params: {
+    occasion: string;
+    file?: File | null;
+    preferences?: string;
+    gender?: string;
+    size?: string;
+    consent?: boolean;
+  }) {
+    setBusy(true);
+    setError(null);
+    setActiveWidget(null);
+    setMessages((m) => [
+      ...m,
+      {
+        role: "user",
+        text: params.file
+          ? `[Occasion: ${params.occasion} + Portrait Provided] ${params.preferences || "Please design the ideal outfit and drape it onto my photo."}`
+          : `[Occasion: ${params.occasion}] ${params.preferences || "Please curate an outfit tailored for this event."}`,
+      },
+    ]);
+    try {
+      const d = await api.createDesignForOccasion(params);
+      localStorage.setItem(STORAGE_KEY, d.design_id);
+      setDesign(d);
+      setAssetErrors({});
+      if (d.tryon_url) {
+        setActiveTab("tryon");
+      } else {
+        setActiveTab("editorial");
+      }
+      setMessages((m) => [
+        ...m,
+        {
+          role: "model",
+          text:
+            d.reply ||
+            (d.tryon_url
+              ? `I have crafted a bespoke silhouette curated exclusively for ${params.occasion} and draped it onto your portrait in the salon mirror.`
+              : `I have curated a bespoke silhouette designed for ${params.occasion}.`),
+        },
+      ]);
+      if (d.suggested_action && d.suggested_action !== "none") {
+        setActiveWidget(d.suggested_action as AtelierAction);
+      }
+      loadArchive();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function startOver() {
     localStorage.removeItem(STORAGE_KEY);
     setDesign(null);
     setMessages([]);
     setQuoteData(null);
     setActiveWidget(null);
+    setPrefilledOccasion("");
     setActiveTab("editorial");
     setAssetErrors({});
   }
@@ -647,8 +749,9 @@ export default function AtelierStudio() {
                 setActiveTab("flats");
                 setActiveWidget(null);
               }}
-              onWidget={(widget) => {
+              onWidget={(widget, occasion) => {
                 setActiveWidget(widget);
+                if (occasion) setPrefilledOccasion(occasion);
               }}
               onRunwayStarted={() => {
                 setActiveTab("runway");
@@ -657,7 +760,24 @@ export default function AtelierStudio() {
             />
           }
           widgetContent={
-            activeWidget === "measurements" ? (
+            activeWidget === "design_upload" ? (
+              <DesignUploadCard
+                onSubmit={handleDesignUploadSubmit}
+                onClose={() => setActiveWidget(null)}
+                busy={busy}
+              />
+            ) : activeWidget === "occasion_stylist" ? (
+              <OccasionStylistCard
+                initialOccasion={prefilledOccasion}
+                hasExistingPortrait={Boolean(design?.has_vto_portrait || design?.tryon_url)}
+                onSubmit={handleOccasionSubmit}
+                onClose={() => {
+                  setActiveWidget(null);
+                  setPrefilledOccasion("");
+                }}
+                busy={busy}
+              />
+            ) : activeWidget === "measurements" ? (
               <MeasurementCard
                 onSubmit={handleApplyMeasurements}
                 onClose={() => setActiveWidget(null)}
@@ -700,6 +820,18 @@ export default function AtelierStudio() {
               {design && (
                 <span className="version-pill">
                   {design.version > 0 ? `v${design.version}` : "Consultation"}
+                </span>
+              )}
+              {design?.occasion && (
+                <span className="occasion-pill" title={`Curated for: ${design.occasion}`}>
+                  <PartyIcon size={11} />
+                  <span>{design.occasion}</span>
+                </span>
+              )}
+              {design?.reference_image_url && (
+                <span className="reference-pill" title="Inspired by uploaded design reference">
+                  <ImageIcon size={11} />
+                  <span>Custom Reference</span>
                 </span>
               )}
             </h2>
@@ -964,6 +1096,16 @@ export default function AtelierStudio() {
                   <span className="swatch-circle" style={{ background: design.spec.color_hex }} />
                   {design.spec.color_hex}
                 </span>
+                {design.occasion && (
+                  <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 600 }}>
+                    <PartyIcon size={11} /> {design.occasion}
+                  </span>
+                )}
+                {design.reference_image_url && (
+                  <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 600 }}>
+                    <ImageIcon size={11} /> Reference-Inspired
+                  </span>
+                )}
                 {design.spec.gender && (
                   <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 600 }}>
                     {design.spec.gender === "menswear" ? "👔 Menswear" : "👗 Womenswear"}
@@ -993,6 +1135,24 @@ export default function AtelierStudio() {
 
               {/* Quick Atelier Actions Toolbar */}
               <div className="showcase-actions">
+                <button
+                  type="button"
+                  className={`showcase-action-btn ${activeWidget === "design_upload" ? "active" : ""}`}
+                  onClick={() => setActiveWidget(activeWidget === "design_upload" ? null : "design_upload")}
+                  title="Upload a design or sketch"
+                >
+                  <ImageIcon size={14} />
+                  <span>Upload Design</span>
+                </button>
+                <button
+                  type="button"
+                  className={`showcase-action-btn ${activeWidget === "occasion_stylist" ? "active" : ""}`}
+                  onClick={() => setActiveWidget(activeWidget === "occasion_stylist" ? null : "occasion_stylist")}
+                  title="Design for an occasion and photo"
+                >
+                  <PartyIcon size={14} />
+                  <span>Occasion Stylist</span>
+                </button>
                 <button
                   type="button"
                   className={`showcase-action-btn ${activeWidget === "measurements" ? "active" : ""}`}

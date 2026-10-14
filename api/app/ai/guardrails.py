@@ -186,7 +186,8 @@ def apply_output_guardrail(
         return turn
 
     if not turn.ready_to_sketch:
-        turn.suggested_action = "consultation"
+        if turn.suggested_action not in ("gender", "design_upload", "occasion_stylist"):
+            turn.suggested_action = "consultation"
         return turn
 
     # If the tailor didn't pick a next action, guide intelligently based on turn
