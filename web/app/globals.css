@@ -1991,3 +1991,248 @@ button.mic.recording {
 .archive-trigger-btn:active {
   transform: translateY(1px) scale(0.985);
 }
+
+/* ==========================================================================
+   Private Atelier Auth Gate & Access Control
+   ========================================================================== */
+
+.atelier-auth-gate {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  background: 
+    radial-gradient(circle at 50% 20%, rgba(197, 168, 128, 0.14) 0%, transparent 60%),
+    radial-gradient(circle at 80% 80%, rgba(237, 229, 216, 0.45) 0%, transparent 50%),
+    var(--bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.atelier-auth-gate::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+
+.atelier-auth-card {
+  max-width: 480px;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 3rem 2.5rem;
+  box-shadow: 
+    0 20px 45px -10px rgba(35, 25, 15, 0.08),
+    0 2px 6px rgba(35, 25, 15, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  text-align: center;
+  position: relative;
+  animation: authFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes authFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.atelier-auth-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7D5D30;
+  background: var(--gold-light);
+  border: 1px solid rgba(197, 168, 128, 0.38);
+  padding: 0.38rem 0.9rem;
+  border-radius: var(--radius-full);
+  margin-bottom: 1.5rem;
+}
+
+.atelier-auth-badge.restricted {
+  background: var(--rose-light);
+  border-color: rgba(168, 88, 88, 0.3);
+  color: var(--rose);
+}
+
+.atelier-auth-title {
+  font-family: var(--font-serif);
+  font-size: 2.1rem;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0 0 0.8rem 0;
+}
+
+.atelier-auth-title span {
+  font-style: italic;
+  color: var(--gold);
+}
+
+.atelier-auth-desc {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0 0 2rem 0;
+}
+
+.google-signin-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 0.88rem 1.5rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  box-shadow: 
+    0 2px 6px rgba(35, 25, 15, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.google-signin-btn:hover {
+  border-color: var(--gold);
+  background: var(--gold-light);
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 18px -2px rgba(197, 168, 128, 0.35);
+}
+
+.google-signin-btn:active {
+  transform: translateY(0);
+}
+
+.atelier-restricted-box {
+  background: var(--rose-light);
+  border: 1px solid rgba(168, 88, 88, 0.25);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.2rem;
+  margin: 1.5rem 0 2rem;
+  text-align: left;
+}
+
+.atelier-restricted-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--rose);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.atelier-restricted-email {
+  font-weight: 600;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.atelier-restricted-instruction {
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+  margin-top: 0.5rem;
+}
+
+.atelier-cli-snippet {
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(26, 24, 23, 0.06);
+  border-radius: var(--radius-sm);
+  font-family: monospace;
+  font-size: 0.76rem;
+  color: var(--ink);
+  overflow-x: auto;
+}
+
+.atelier-auth-footer {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line-light);
+  font-size: 0.8rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.atelier-auth-footer a {
+  color: var(--gold-hover);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.atelier-auth-footer a:hover {
+  text-decoration: underline;
+}
+
+.auth-user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--ink-secondary);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-full);
+}
+
+.auth-user-role {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--cream);
+  color: var(--ink-secondary);
+}
+
+.auth-user-role.admin {
+  background: var(--gold-light);
+  color: #7D5D30;
+  border: 1px solid rgba(197, 168, 128, 0.4);
+}
+
+.signout-nav-btn {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.signout-nav-btn:hover {
+  color: var(--rose);
+  border-color: var(--rose);
+  background: var(--rose-light);
+}

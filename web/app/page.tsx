@@ -1,6 +1,6 @@
 "use client";
 
-import { signInAnonymously } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArchiveDrawer } from "@/components/ArchiveDrawer";
@@ -11,12 +11,15 @@ import {
   ArchiveIcon,
   ClipboardIcon,
   FilmIcon,
+  GoogleIcon,
+  LockIcon,
   MannequinIcon,
   MirrorIcon,
   PlusIcon,
   RefreshIcon,
   RulerIcon,
   ScissorsIcon,
+  ShieldCheckIcon,
   SparkleIcon,
 } from "@/components/icons";
 import { LiveVoice } from "@/components/LiveVoice";
@@ -48,6 +51,12 @@ export default function AtelierStudio() {
   const [error, setError] = useState<string | null>(null);
   const [demoMode, setDemoMode] = useState<string>("off");
 
+  // Private Atelier Access Control State
+  const [authChecking, setAuthChecking] = useState(true);
+  const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [authDeniedReason, setAuthDeniedReason] = useState<string | null>(null);
+
   // Loading & Consultation History State
   const [initialLoading, setInitialLoading] = useState(true);
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -69,9 +78,35 @@ export default function AtelierStudio() {
     api.health().then((h) => setDemoMode(h.demo_mode)).catch(() => {});
   }, [api]);
 
+  // Authenticate user against Atelier allowlist
   useEffect(() => {
-    if (ready && !user) signInAnonymously(auth).catch((e) => setError(e.message));
-  }, [ready, user, auth]);
+    if (!ready) return;
+    if (!user || user.isAnonymous) {
+      setIsAllowed(false);
+      setUserRole(null);
+      setAuthChecking(false);
+      return;
+    }
+    setAuthChecking(true);
+    api
+      .checkAuth()
+      .then((res) => {
+        setIsAllowed(res.allowed);
+        setUserRole(res.role ?? null);
+        if (!res.allowed) {
+          setAuthDeniedReason(res.reason || "Your Google account is not on the Atelier allowlist.");
+        } else {
+          setAuthDeniedReason(null);
+        }
+      })
+      .catch((err) => {
+        setIsAllowed(false);
+        setAuthDeniedReason((err as Error).message);
+      })
+      .finally(() => {
+        setAuthChecking(false);
+      });
+  }, [ready, user, api]);
 
   async function loadArchive() {
     setArchiveLoading(true);
@@ -86,7 +121,7 @@ export default function AtelierStudio() {
   }
 
   useEffect(() => {
-    if (!ready || !user) return;
+    if (!ready || !user || user.isAnonymous || !isAllowed) return;
     loadArchive();
     const id = localStorage.getItem(STORAGE_KEY);
     if (!id) {
@@ -108,7 +143,7 @@ export default function AtelierStudio() {
       .finally(() => {
         setInitialLoading(false);
       });
-  }, [ready, user, api]);
+  }, [ready, user, isAllowed, api]);
 
   function liveTranscript(role: "user" | "model", text: string) {
     if (role === "user" && text.trim()) {
@@ -282,6 +317,136 @@ export default function AtelierStudio() {
     setAssetErrors({});
   }
 
+  async function handleGoogleSignIn() {
+    setError(null);
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      await signInWithPopup(auth, provider);
+    } catch (err: unknown) {
+      const e = err as { code?: string; message?: string };
+      if (e.code !== "auth/popup-closed-by-user") {
+        setError(e.message || "Failed to sign in with Google.");
+      }
+    }
+  }
+
+  async function handleSignOut() {
+    localStorage.removeItem(STORAGE_KEY);
+    await signOut(auth);
+  }
+
+  if (!ready || (user && !user.isAnonymous && authChecking)) {
+    return (
+      <div className="atelier-auth-gate">
+        <div className="atelier-auth-card">
+          <div className="atelier-auth-badge">
+            <SparkleIcon size={13} />
+            <span>Thread &amp; Pixel Atelier</span>
+          </div>
+          <h2 className="atelier-auth-title">
+            Private <span>Salon</span>
+          </h2>
+          <p className="atelier-auth-desc">Verifying authorized couture credentials...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || user.isAnonymous) {
+    return (
+      <div className="atelier-auth-gate">
+        <div className="atelier-auth-card">
+          <div className="atelier-auth-badge">
+            <LockIcon size={13} />
+            <span>Private Atelier Salon</span>
+          </div>
+          <h2 className="atelier-auth-title">
+            Thread <span>&amp;</span> Pixel
+          </h2>
+          <p className="atelier-auth-desc">
+            Haute Couture Atelier Studio. Sign in with your authorized Google account to access conversational draping, runway synthesis, and precision technical packs.
+          </p>
+
+          {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
+
+          <button
+            type="button"
+            className="google-signin-btn"
+            onClick={handleGoogleSignIn}
+          >
+            <GoogleIcon size={18} />
+            <span>Sign in with Google</span>
+          </button>
+
+          <div className="atelier-auth-footer">
+            <span>Production operators:</span>
+            <Link href="/factory">Factory Portal &rarr;</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAllowed) {
+    return (
+      <div className="atelier-auth-gate">
+        <div className="atelier-auth-card">
+          <div className="atelier-auth-badge restricted">
+            <AlertTriangleIcon size={13} />
+            <span>Access Restricted</span>
+          </div>
+          <h2 className="atelier-auth-title">
+            Atelier <span>Access Restricted</span>
+          </h2>
+          <p className="atelier-auth-desc">
+            Your account is authenticated, but not enrolled on the Thread &amp; Pixel studio allowlist.
+          </p>
+
+          <div className="atelier-restricted-box">
+            <div className="atelier-restricted-header">
+              <LockIcon size={14} />
+              <span>Unauthorized Account</span>
+            </div>
+            <div className="atelier-restricted-email">{user.email || user.uid}</div>
+            <div className="atelier-restricted-instruction">
+              {authDeniedReason || "This account does not have active designer or administrator privileges."}
+              <br />
+              Ask an atelier administrator to authorize this email:
+            </div>
+            <div className="atelier-cli-snippet">
+              python api/scripts/manage_allowed_users.py add {user.email || "email@example.com"} designer
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
+            <button
+              type="button"
+              className="google-signin-btn"
+              style={{ width: "auto" }}
+              onClick={handleGoogleSignIn}
+              title="Sign in with a different Google account"
+            >
+              Switch Account
+            </button>
+            <button
+              type="button"
+              className="signout-nav-btn"
+              onClick={handleSignOut}
+            >
+              Sign Out
+            </button>
+          </div>
+
+          <div className="atelier-auth-footer">
+            <span>Factory order management:</span>
+            <Link href="/factory">Factory Portal &rarr;</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="atelier-app">
       <header className="topbar">
@@ -293,6 +458,11 @@ export default function AtelierStudio() {
         </div>
         <nav>
           {demoMode !== "off" && <span className="demo-badge">demo mode: {demoMode}</span>}
+          <div className="auth-user-badge" title={`Signed in as ${user.email}`}>
+            <ShieldCheckIcon size={14} />
+            <span>{user.email?.split("@")[0]}</span>
+            {userRole && <span className={`auth-user-role ${userRole}`}>{userRole}</span>}
+          </div>
           <button
             type="button"
             className="archive-trigger-btn"
@@ -311,6 +481,14 @@ export default function AtelierStudio() {
             </button>
           )}
           <Link href="/factory">Factory Portal</Link>
+          <button
+            type="button"
+            className="signout-nav-btn"
+            onClick={handleSignOut}
+            title="Sign out of Atelier Studio"
+          >
+            Sign Out
+          </button>
         </nav>
       </header>
 

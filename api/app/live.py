@@ -19,7 +19,7 @@ from google.genai import live as genai_live
 from google.genai import types
 from websockets.exceptions import ConnectionClosed
 
-from .auth import User, verify_token
+from .auth import User, check_user_allowed, verify_token
 from .clients import live as live_client
 from .config import settings
 from .models import MessageIn
@@ -185,6 +185,7 @@ async def live_session(ws: WebSocket):
         if start.get("type") != "start":
             raise ValueError("expected start frame")
         user = await asyncio.to_thread(verify_token, start.get("token"))
+        await asyncio.to_thread(check_user_allowed, user)
     except (HTTPException, ValueError, asyncio.TimeoutError, WebSocketDisconnect) as exc:
         log.warning("live: rejected session: %s", exc)
         await ws.close(code=1008)

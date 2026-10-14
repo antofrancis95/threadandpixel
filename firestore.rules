@@ -21,6 +21,10 @@ service cloud.firestore {
         && request.resource.data.status in ['new', 'cutting', 'sewing', 'shipped'];
     }
 
+    match /allowed_users/{email} {
+      allow read: if signedIn() && request.auth.token.email != null && request.auth.token.email.lower() == email.lower();
+    }
+
     // Everything else (including all creates) goes through the API with the Admin SDK.
     match /{document=**} {
       allow read, write: if false;

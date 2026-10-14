@@ -13,9 +13,17 @@ if not firebase_admin._apps:
 
 
 class User:
-    def __init__(self, uid: str, role: str | None):
+    def __init__(
+        self,
+        uid: str,
+        role: str | None,
+        email: str | None = None,
+        is_anonymous: bool = False,
+    ):
         self.uid = uid
         self.role = role
+        self.email = email
+        self.is_anonymous = is_anonymous
 
     @property
     def is_factory(self) -> bool:
@@ -24,7 +32,7 @@ class User:
 
 def verify_token(token: str | None) -> User:
     if settings.auth_disabled:
-        return User("local-dev", "factory")
+        return User("local-dev", "factory", email="local-dev@example.com", is_anonymous=False)
     if not token:
         log.warning("401: missing bearer token")
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
@@ -34,9 +42,44 @@ def verify_token(token: str | None) -> User:
     except Exception as exc:
         log.warning("401: token verification failed: %s: %s", type(exc).__name__, exc)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid token")
-    return User(decoded["uid"], decoded.get("role"))
+
+    email = decoded.get("email")
+    is_anon = decoded.get("firebase", {}).get("sign_in_provider") == "anonymous"
+    return User(decoded["uid"], decoded.get("role"), email=email, is_anonymous=is_anon)
+
+
+def check_user_allowed(user: User) -> None:
+    if settings.auth_disabled:
+        return
+    if user.is_factory:
+        return
+    if user.is_anonymous or not user.email:
+        log.warning("403: rejected anonymous/email-less user: %s", user.uid)
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Anonymous users are not permitted. Please sign in with an authorized Google account.",
+        )
+
+    # Lazy-import db to avoid circular imports
+    from .clients import db
+
+    email = user.email.strip().lower()
+    doc_ref = db().collection("allowed_users").document(email)
+    snap = doc_ref.get()
+    if not snap.exists or snap.to_dict().get("enabled", True) is False:
+        log.warning("403: user '%s' not in allowed_users list", user.email)
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"Access denied: Account '{user.email}' is not in the approved design portal list.",
+        )
 
 
 def current_user(authorization: str | None = Header(default=None)) -> User:
-    token = authorization.removeprefix("Bearer ").strip() if authorization and authorization.startswith("Bearer ") else None
-    return verify_token(token)
+    token = (
+        authorization.removeprefix("Bearer ").strip()
+        if authorization and authorization.startswith("Bearer ")
+        else None
+    )
+    user = verify_token(token)
+    check_user_allowed(user)
+    return user

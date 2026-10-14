@@ -11,7 +11,7 @@ export type MessageInput = {
 export function createApi(baseUrl: string, auth: Auth) {
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const token = await auth.currentUser?.getIdToken();
-    if (!token) throw new Error("Not signed in yet. Check that Anonymous sign-in is enabled in Firebase Authentication.");
+    if (!token) throw new Error("Not signed in. Please sign in with your authorized Google account.");
     const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
     if (init.body && !(init.body instanceof FormData)) headers["Content-Type"] = "application/json";
 
@@ -52,6 +52,23 @@ export function createApi(baseUrl: string, auth: Auth) {
     getJob: (jobId: string) => request<Job>(`/jobs/${encodeURIComponent(jobId)}`),
     health: () =>
       fetch(`${baseUrl}/healthz`).then((r) => r.json() as Promise<{ ok: boolean; demo_mode: string }>),
+    checkAuth: async () => {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) return { allowed: false, authenticated: false, reason: "Not signed in" };
+      const res = await fetch(`${baseUrl}/auth/check`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        return { allowed: false, authenticated: true, reason: `Server error (${res.status})` };
+      }
+      return res.json() as Promise<{
+        allowed: boolean;
+        email?: string | null;
+        role?: string | null;
+        authenticated: boolean;
+        reason?: string | null;
+      }>;
+    },
     liveUrl: () => `${baseUrl.replace(/^http/, "ws")}/live`,
   };
 }

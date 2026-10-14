@@ -1,7 +1,7 @@
 import io
 import uuid
 
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from google.cloud import firestore
@@ -10,7 +10,7 @@ from PIL import Image, UnidentifiedImageError
 from . import demo, live, pricing, storage
 from .ai import designer, runway, techpack, tryon
 from .ai.common import AIError
-from .auth import User, current_user
+from .auth import User, current_user, verify_token
 from .clients import db
 from .config import settings
 from .models import DesignSpec, MessageIn, OrderIn, PhotoCheck, TechPackCritique, TechPackIn, TryOnIn
@@ -47,6 +47,40 @@ def _ai_error(_: Request, exc: AIError):
 @app.get("/healthz")
 def healthz():
     return {"ok": True, "demo_mode": settings.demo_mode}
+
+
+@app.get("/auth/check")
+def check_auth(authorization: str | None = Header(default=None)):
+    token = (
+        authorization.removeprefix("Bearer ").strip()
+        if authorization and authorization.startswith("Bearer ")
+        else None
+    )
+    if settings.auth_disabled:
+        return {"allowed": True, "email": "local-dev@example.com", "role": "factory", "authenticated": True}
+    try:
+        user = verify_token(token)
+    except HTTPException as e:
+        return {"allowed": False, "authenticated": False, "reason": e.detail}
+
+    if user.is_anonymous or not user.email:
+        return {"allowed": False, "authenticated": True, "email": None, "reason": "Anonymous accounts are not permitted."}
+
+    if user.is_factory:
+        return {"allowed": True, "email": user.email, "role": "factory", "authenticated": True}
+
+    email = user.email.strip().lower()
+    snap = db().collection("allowed_users").document(email).get()
+    is_allowed = snap.exists and snap.to_dict().get("enabled", True) is not False
+    role = snap.to_dict().get("role", "designer") if snap.exists else None
+
+    return {
+        "allowed": is_allowed,
+        "email": user.email,
+        "role": role,
+        "authenticated": True,
+        "reason": None if is_allowed else f"Account '{user.email}' is not in the approved design portal list.",
+    }
 
 
 @app.get("/catalog")
