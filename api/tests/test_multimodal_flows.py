@@ -1,11 +1,24 @@
 import io
 from unittest.mock import AsyncMock, patch
+import pytest
 from fastapi.testclient import TestClient
+from app.auth import User, current_user
 from app.main import app
 from app.models import DesignSpec
 from app.service import design_response
 
 client = TestClient(app)
+
+@pytest.fixture(autouse=True)
+def override_auth():
+    app.dependency_overrides[current_user] = lambda: User(
+        uid="test-user-123",
+        email="designer@atelier.com",
+        role="designer",
+        is_anonymous=False,
+    )
+    yield
+    app.dependency_overrides.pop(current_user, None)
 
 
 def test_design_response_with_reference_and_occasion():
