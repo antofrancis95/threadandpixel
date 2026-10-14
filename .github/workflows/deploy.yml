@@ -43,9 +43,11 @@ jobs:
           cache-dependency-path: api/requirements.txt
 
       - name: Install Python Dependencies & Test
+        working-directory: api
         run: |
-          pip install -r api/requirements.txt pytest
-          cd api && PYTHONPATH=. pytest tests -v
+          pip install -r requirements.txt pytest
+          cp .env.example .env
+          PYTHONPATH=. pytest tests -v
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4

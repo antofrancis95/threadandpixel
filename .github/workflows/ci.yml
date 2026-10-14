@@ -36,6 +36,7 @@ jobs:
       - name: Run Pytest
         working-directory: api
         run: |
+          cp .env.example .env
           PYTHONPATH=. pytest tests -v
 
   web-checks:
