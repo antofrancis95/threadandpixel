@@ -52,6 +52,9 @@ foreach ($role in "roles/run.admin", "roles/cloudbuild.builds.editor", "roles/st
 }
 & gcloud iam service-accounts add-iam-policy-binding $RuntimeSA --project=$Project --member="serviceAccount:$DeployerSA" --role="roles/iam.serviceAccountUser" --condition=None --quiet 2>$null | Out-Null
 
+$BuildSA = "$ProjectNum-compute@developer.gserviceaccount.com"
+& gcloud iam service-accounts add-iam-policy-binding $BuildSA --project=$Project --member="serviceAccount:$DeployerSA" --role="roles/iam.serviceAccountUser" --condition=None --quiet 2>$null | Out-Null
+
 # Impersonation
 $member = "principalSet://iam.googleapis.com/projects/$ProjectNum/locations/global/workloadIdentityPools/$PoolName/attribute.repository/$GithubRepo"
 & gcloud iam service-accounts add-iam-policy-binding $DeployerSA --project=$Project --role="roles/iam.workloadIdentityUser" --member=$member --condition=None --quiet | Out-Null

@@ -96,9 +96,17 @@ for role in "roles/run.admin" "roles/cloudbuild.builds.editor" "roles/storage.ad
     --condition=None --quiet > /dev/null
 done
 
-# Allow deployer SA to impersonate/act as runtime SA
+# Allow deployer SA to impersonate/act as runtime SA and build SA
 echo "==> Allowing tp-deployer to act as ${RUNTIME_SA}..."
 gcloud iam service-accounts add-iam-policy-binding "${RUNTIME_SA}" \
+  --project="${PROJECT_ID}" \
+  --member="serviceAccount:${DEPLOYER_SA}" \
+  --role="roles/iam.serviceAccountUser" \
+  --condition=None --quiet > /dev/null || true
+
+BUILD_SA="${PROJECT_NUM}-compute@developer.gserviceaccount.com"
+echo "==> Allowing tp-deployer to act as build SA (${BUILD_SA})..."
+gcloud iam service-accounts add-iam-policy-binding "${BUILD_SA}" \
   --project="${PROJECT_ID}" \
   --member="serviceAccount:${DEPLOYER_SA}" \
   --role="roles/iam.serviceAccountUser" \
