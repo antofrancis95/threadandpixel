@@ -47,7 +47,7 @@ if (-not $saExists) {
 }
 
 # Roles
-foreach ($role in "roles/run.admin", "roles/cloudbuild.builds.editor", "roles/storage.admin") {
+foreach ($role in "roles/run.admin", "roles/cloudbuild.builds.editor", "roles/storage.admin", "roles/artifactregistry.admin") {
     & gcloud projects add-iam-policy-binding $Project --member="serviceAccount:$DeployerSA" --role=$role --condition=None --quiet | Out-Null
 }
 & gcloud iam service-accounts add-iam-policy-binding $RuntimeSA --project=$Project --member="serviceAccount:$DeployerSA" --role="roles/iam.serviceAccountUser" --condition=None --quiet 2>$null | Out-Null

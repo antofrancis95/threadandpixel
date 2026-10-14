@@ -89,7 +89,7 @@ fi
 
 # 7. Grant Necessary IAM Roles to tp-deployer
 echo "==> Granting IAM roles to ${DEPLOYER_SA}..."
-for role in "roles/run.admin" "roles/cloudbuild.builds.editor" "roles/storage.admin"; do
+for role in "roles/run.admin" "roles/cloudbuild.builds.editor" "roles/storage.admin" "roles/artifactregistry.admin"; do
   gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member="serviceAccount:${DEPLOYER_SA}" \
     --role="${role}" \
