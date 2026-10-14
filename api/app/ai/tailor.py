@@ -1,6 +1,7 @@
 """AI Couturier Agent (Google ADK): turns voice/text into a structured DesignSpec, image instructions, and next steps."""
 
 import base64
+import re
 
 from google.adk.agents import Agent
 from google.genai import types
@@ -24,10 +25,10 @@ Your mission:
      * If female: tailor womenswear / feminine silhouettes (couture evening gowns, cocktail dresses, draped silk jumpsuits, bespoke skirts, feminine tailored ensembles). Set spec.gender = "womenswear".
      * Design the piece immediately tailored to their perceived gender on the first voice turn without ever asking them.
    - FROM TEXT CHAT INPUT (no audio):
-     * If gender is not explicitly stated in their text message or prior design spec (e.g., they ask for "an outfit for a gala", "a velvet jacket", "something chic", or general greetings):
-       You MUST explicitly ask who this bespoke piece is for: whether we are tailoring for a gentleman (menswear) or a lady (womenswear). Set suggested_action = "gender".
-     * If the client explicitly mentioned gender or gender-specific garment in text (e.g. "men's suit", "for a gentleman", "women's gown", "cocktail dress", "for my husband"):
-       Recognize that gender immediately, set spec.gender accordingly ("menswear" or "womenswear"), and design the garment without re-asking.
+     * If masculine or feminine garments/terms are mentioned (e.g. "tuxedo", "suit", "blazer", "gentleman", "for my husband" -> menswear; "evening gown", "cocktail dress", "skirt", "corset", "for my wife" -> womenswear):
+       Recognize that gender immediately, set spec.gender accordingly ("menswear" or "womenswear"), and proceed with the consultation or sketch without re-asking.
+     * If gender is completely unspecified and garment is ambiguous (e.g. "an outfit for a gala", "something chic", "a velvet jacket" without gender):
+       Only then ask who this bespoke piece is for: whether we are tailoring for a gentleman (menswear) or a lady (womenswear). Set suggested_action = "gender".
 
 2. BESPOKE CONSULTATION BEFORE SKETCHING (CRITICAL):
    - When the client's request is an initial, high-level, or broad inquiry (e.g., "I'm looking for a polo", "I want a dress", "A bespoke suit", "I need a shirt", "Something chic for a dinner") lacking basic details (color, fit/silhouette, fabric, size):
@@ -161,6 +162,34 @@ def _user_parts(msg: MessageIn, sanitized_text: str | None) -> list[types.Part]:
     return parts
 
 
+_MASCULINE_KEYWORDS = {
+    "gentleman", "gentlemen", "man", "men", "mens", "menswear", "male", "boy", "boys",
+    "him", "his", "he", "husband", "father", "brother", "son", "groom", "groomsman",
+    "tuxedo", "tux", "suit", "blazer", "trousers", "chinos", "tie", "bowtie", "cufflinks",
+    "polo", "overcoat", "waistcoat", "smoking jacket",
+}
+_FEMININE_KEYWORDS = {
+    "lady", "ladies", "woman", "women", "womens", "womenswear", "female", "girl", "girls",
+    "her", "hers", "she", "wife", "mother", "sister", "daughter", "bride", "bridesmaid",
+    "gown", "dress", "cocktail dress", "evening gown", "skirt", "corset", "blouse",
+    "bodice", "bustier", "peplum",
+}
+
+
+def detect_semantic_gender(text: str | None) -> str | None:
+    if not text:
+        return None
+    lower = text.lower()
+    words = set(re.findall(r"\b[a-z\-']+\b", lower))
+    has_masc = any(w in words for w in _MASCULINE_KEYWORDS)
+    has_fem = any(w in words for w in _FEMININE_KEYWORDS)
+    if has_masc and not has_fem:
+        return "menswear"
+    if has_fem and not has_masc:
+        return "womenswear"
+    return None
+
+
 def converse(
     msg: MessageIn,
     history: list[dict],
@@ -179,9 +208,14 @@ def converse(
         if has_vto
         else "No client portrait uploaded yet."
     )
+    inferred_gender = (
+        explicit_gender
+        or (current.gender if current and current.gender in ("menswear", "womenswear") else None)
+        or detect_semantic_gender(sanitized_text or msg.text)
+    )
     gender_directive = (
-        f"Client explicit target gender: {explicit_gender}. Enforce spec.gender='{explicit_gender}' and design the silhouette accordingly."
-        if explicit_gender
+        f"Client explicit target gender: {inferred_gender}. Enforce spec.gender='{inferred_gender}' and design the silhouette accordingly."
+        if inferred_gender
         else "In voice mode: deduce gender from vocal acoustics. In text chat: prompt for gender if not specified."
     )
     occasion_directive = (
@@ -221,8 +255,11 @@ def converse(
     )
     turn = parse_structured(response, TailorTurn)
 
-    if explicit_gender and explicit_gender in ("menswear", "womenswear", "unisex"):
-        turn.spec.gender = explicit_gender
+    resolved_gender = explicit_gender or inferred_gender
+    if resolved_gender and resolved_gender in ("menswear", "womenswear", "unisex"):
+        turn.spec.gender = resolved_gender
+    elif current and current.gender in ("menswear", "womenswear"):
+        turn.spec.gender = current.gender
 
     if msg.size:
         turn.spec.size = msg.size
@@ -290,10 +327,21 @@ def converse_for_occasion(
 ) -> TailorTurn:
     """Specialized Couturier consultation designing an outfit for an occasion tailored to the client's photo."""
     sanitized_pref, brand_notice = sanitize_input_text(preferences or "")
+    inferred_gender = explicit_gender or detect_semantic_gender(sanitized_pref or occasion)
+    gender_instruction = (
+        f"Client explicit target gender: '{inferred_gender}'. Enforce spec.gender='{inferred_gender}'."
+        if inferred_gender
+        else (
+            "CRITICAL GENDER IDENTIFICATION FROM PORTRAIT: Inspect the VIP client's photo carefully to identify their gender. "
+            "If the person is a gentleman (male), you MUST set spec.gender='menswear' and sculpt a masculine silhouette (e.g. bespoke suit, tuxedo, structured blazer, trousers). "
+            "If the person is a lady (female), you MUST set spec.gender='womenswear' and sculpt a feminine silhouette (e.g. evening gown, cocktail dress, draped ensemble). "
+            "Under NO circumstances should you default a gentleman to womenswear."
+        )
+    )
     prompt = (
         f"The VIP client has provided their portrait/photo and specified an occasion: '{occasion}'. "
         "Analyze the client's photo (their frame, skin undertone, posture, hair, visual gender/demeanor) and the occasion's dress code and glamour. "
-        f"{f'Client target gender: {explicit_gender}. ' if explicit_gender else ''}"
+        f"{gender_instruction} "
         f"{f'Client requested size: {size}. ' if size else ''}"
         f"{f'Client styling preferences: {sanitized_pref}. ' if sanitized_pref else ''}"
         f"Conceive the ultimate bespoke haute couture outfit uniquely tailored for this client to shine at '{occasion}'. "
@@ -315,8 +363,8 @@ def converse_for_occasion(
     pref_text = f" ({preferences})" if preferences else ""
     turn.user_transcript = f"Bespoke outfit for {occasion}{pref_text} based on uploaded photo."
     turn.ready_to_sketch = True
-    if explicit_gender and explicit_gender in ("menswear", "womenswear", "unisex"):
-        turn.spec.gender = explicit_gender
+    if inferred_gender and inferred_gender in ("menswear", "womenswear", "unisex"):
+        turn.spec.gender = inferred_gender
     if size:
         turn.spec.size = size
     turn = apply_output_guardrail(turn, brand_notice=brand_notice, has_vto=True, current_spec=None)

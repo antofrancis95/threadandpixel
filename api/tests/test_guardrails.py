@@ -279,3 +279,18 @@ def test_message_in_fields_support():
     assert msg.occasion == "Black-tie Gala"
     assert msg.design_image_mime == "image/png"
     assert msg.size == "M"
+
+
+def test_detect_semantic_gender():
+    from app.ai.tailor import detect_semantic_gender
+
+    assert detect_semantic_gender("I need a bespoke tuxedo for a black-tie gala") == "menswear"
+    assert detect_semantic_gender("Tailor a navy blazer and charcoal trousers for a gentleman") == "menswear"
+    assert detect_semantic_gender("Designing a suit for my husband") == "menswear"
+
+    assert detect_semantic_gender("I need an emerald evening gown for a red carpet gala") == "womenswear"
+    assert detect_semantic_gender("Cocktail dress in silk chiffon for a summer wedding") == "womenswear"
+    assert detect_semantic_gender("A bespoke skirt and corset ensemble for my wife") == "womenswear"
+
+    assert detect_semantic_gender("Something chic for an evening event") is None
+    assert detect_semantic_gender(None) is None

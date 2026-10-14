@@ -74,19 +74,33 @@ body:has(.landing-root) {
   border-radius: 2px;
 }
 
+/* Accessible skip link: only revealed when focused via keyboard navigation (:focus-visible) */
+.landing-root .lp-skip,
 .lp-skip {
-  position: absolute;
+  position: fixed;
   left: 1rem;
-  top: -4rem;
+  top: -5rem;
   z-index: 200;
-  padding: 0.6rem 1rem;
+  padding: 0.6rem 1.1rem;
   background: var(--ink);
-  color: #fff;
+  color: #ffffff !important;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   border-radius: var(--radius-full);
   text-decoration: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: top 0.2s ease, opacity 0.2s ease;
+  pointer-events: none;
+  opacity: 0;
 }
-.lp-skip:focus {
+
+.landing-root .lp-skip:focus-visible,
+.lp-skip:focus-visible {
   top: 1rem;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .lp-main {

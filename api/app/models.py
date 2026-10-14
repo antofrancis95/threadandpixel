@@ -20,7 +20,7 @@ class DesignSpec(BaseModel):
     closures: list[Closure]
     embellishments: list[Embellishment]
     lining: bool
-    gender: Gender = "womenswear"
+    gender: Gender = "unisex"
     size: Size | None = None
     fit: str | None = None
 

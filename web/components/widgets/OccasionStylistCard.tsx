@@ -15,12 +15,14 @@ const OCCASION_SUGGESTIONS = [
 
 export function OccasionStylistCard({
   initialOccasion = "",
+  initialGender = null,
   hasExistingPortrait = false,
   onSubmit,
   onClose,
   busy = false,
 }: {
   initialOccasion?: string;
+  initialGender?: "womenswear" | "menswear" | null;
   hasExistingPortrait?: boolean;
   onSubmit: (params: {
     occasion: string;
@@ -38,7 +40,7 @@ export function OccasionStylistCard({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [consent, setConsent] = useState<boolean>(true);
   const [preferences, setPreferences] = useState<string>("");
-  const [gender, setGender] = useState<"womenswear" | "menswear">("womenswear");
+  const [gender, setGender] = useState<"womenswear" | "menswear" | null>(initialGender || null);
   const [selectedSize, setSelectedSize] = useState<string>("M");
   const [useSavedPortrait, setUseSavedPortrait] = useState<boolean>(hasExistingPortrait);
 
@@ -47,6 +49,12 @@ export function OccasionStylistCard({
       setOccasion(initialOccasion);
     }
   }, [initialOccasion]);
+
+  useEffect(() => {
+    if (initialGender) {
+      setGender(initialGender);
+    }
+  }, [initialGender]);
 
   function handleFileChange(selected: File | null) {
     if (!selected) return;
@@ -63,7 +71,7 @@ export function OccasionStylistCard({
       occasion: occasion.trim(),
       file: useSavedPortrait ? null : file,
       preferences: preferences.trim() || undefined,
-      gender,
+      gender: gender || undefined,
       size: selectedSize,
       consent,
     });
@@ -241,14 +249,21 @@ export function OccasionStylistCard({
 
       {/* Target Silhouette Gender */}
       <div style={{ marginBottom: "0.85rem" }}>
-        <label style={{ fontSize: "0.78rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
-          Target Wardrobe
-        </label>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.35rem" }}>
+          <label style={{ fontSize: "0.78rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+            Target Wardrobe
+          </label>
+          {!gender && (
+            <span style={{ fontSize: "0.72rem", color: "var(--gold-dark)", fontWeight: 500 }}>
+              ✦ Auto-detect from portrait or select
+            </span>
+          )}
+        </div>
         <div style={{ display: "flex", gap: "0.45rem" }}>
           <button
             type="button"
             className={`chip-btn ${gender === "womenswear" ? "highlight" : ""}`}
-            onClick={() => setGender("womenswear")}
+            onClick={() => setGender(gender === "womenswear" ? null : "womenswear")}
             disabled={busy}
             style={{ padding: "0.38rem 0.75rem", fontSize: "0.8rem" }}
           >
@@ -258,7 +273,7 @@ export function OccasionStylistCard({
           <button
             type="button"
             className={`chip-btn ${gender === "menswear" ? "highlight" : ""}`}
-            onClick={() => setGender("menswear")}
+            onClick={() => setGender(gender === "menswear" ? null : "menswear")}
             disabled={busy}
             style={{ padding: "0.38rem 0.75rem", fontSize: "0.8rem" }}
           >

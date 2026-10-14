@@ -84,6 +84,7 @@ export default function AtelierStudio() {
   const [activeTab, setActiveTab] = useState<ShowcaseTab>("editorial");
   const [activeWidget, setActiveWidget] = useState<AtelierAction>(null);
   const [prefilledOccasion, setPrefilledOccasion] = useState<string>("");
+  const [prefilledGender, setPrefilledGender] = useState<"womenswear" | "menswear" | null>(null);
   const [quoteData, setQuoteData] = useState<QuoteResponse | null>(null);
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [tryonBusy, setTryonBusy] = useState(false);
@@ -191,11 +192,8 @@ export default function AtelierStudio() {
     setDesign(d);
     setAssetErrors({});
     setActiveTab("editorial");
-    if (d.suggested_action && d.suggested_action !== "none") {
-      setActiveWidget(d.suggested_action as AtelierAction);
-    } else {
-      setActiveWidget(null);
-    }
+    // In live voice mode, keep the flow conversational without forcing open popups
+    setActiveWidget(null);
     loadArchive();
   }
 
@@ -440,6 +438,7 @@ export default function AtelierStudio() {
     setQuoteData(null);
     setActiveWidget(null);
     setPrefilledOccasion("");
+    setPrefilledGender(null);
     setActiveTab("editorial");
     setAssetErrors({});
   }
@@ -819,9 +818,10 @@ export default function AtelierStudio() {
                 setActiveTab("flats");
                 setActiveWidget(null);
               }}
-              onWidget={(widget, occasion) => {
+              onWidget={(widget, occasion, gender) => {
                 setActiveWidget(widget);
                 if (occasion) setPrefilledOccasion(occasion);
+                if (gender === "menswear" || gender === "womenswear") setPrefilledGender(gender);
               }}
               onRunwayStarted={() => {
                 setActiveTab("runway");
@@ -839,11 +839,13 @@ export default function AtelierStudio() {
             ) : activeWidget === "occasion_stylist" ? (
               <OccasionStylistCard
                 initialOccasion={prefilledOccasion}
+                initialGender={prefilledGender || (design?.spec.gender === "menswear" || design?.spec.gender === "womenswear" ? design.spec.gender : null)}
                 hasExistingPortrait={Boolean(design?.has_vto_portrait || design?.tryon_url)}
                 onSubmit={handleOccasionSubmit}
                 onClose={() => {
                   setActiveWidget(null);
                   setPrefilledOccasion("");
+                  setPrefilledGender(null);
                 }}
                 busy={busy}
               />

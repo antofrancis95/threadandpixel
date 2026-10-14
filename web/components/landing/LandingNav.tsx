@@ -1,11 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export function Wordmark({ withTag = false, ampId }: { withTag?: boolean; ampId?: string }) {
+  const pathname = usePathname();
+
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (pathname === "/") {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
   return (
-    <Link href="/" className="lp-wordmark" aria-label="Thread & Pixel, home">
+    <Link
+      href="/"
+      className="lp-wordmark"
+      aria-label="Thread & Pixel, home"
+      onClick={handleClick}
+    >
       <span>Thread</span>
       <span className="lp-amp" aria-hidden="true">
         &amp;

@@ -25,7 +25,7 @@ export default function LandingPage() {
       </a>
       <LandingNav />
       <ThreadLine />
-      <main id="main" className="lp-main">
+      <main id="main" className="lp-main" tabIndex={-1}>
         <Hero />
         <GarmentStory media={{ flats: media.flats, tryon: media.tryon }} />
         <Showcase media={media} />
