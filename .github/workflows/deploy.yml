@@ -97,21 +97,21 @@ jobs:
         run: |
           echo "==> Deploying tp-api..."
           ENV_VARS="GOOGLE_CLOUD_PROJECT=${PROJECT_ID}"
-          ENV_VARS="${ENV_VARS},GOOGLE_CLOUD_REGION=${REGION}"
-          ENV_VARS="${ENV_VARS},ASSET_BUCKET=${ASSET_BUCKET}"
-          ENV_VARS="${ENV_VARS},GEMINI_LOCATION=${{ vars.GEMINI_LOCATION || 'global' }}"
-          ENV_VARS="${ENV_VARS},IMAGING_LOCATION=${{ vars.IMAGING_LOCATION || 'us-central1' }}"
-          ENV_VARS="${ENV_VARS},LIVE_LOCATION=${{ vars.LIVE_LOCATION || 'us-central1' }}"
-          ENV_VARS="${ENV_VARS},MODEL_FLASH=${{ vars.MODEL_FLASH || 'gemini-3.8-flash' }}"
-          ENV_VARS="${ENV_VARS},MODEL_LITE=${{ vars.MODEL_LITE || 'gemini-3.5-flash-lite' }}"
-          ENV_VARS="${ENV_VARS},MODEL_PRO=${{ vars.MODEL_PRO || 'gemini-3.1-pro-preview' }}"
-          ENV_VARS="${ENV_VARS},MODEL_IMAGE=${{ vars.MODEL_IMAGE || 'gemini-nano-banana-2.1' }}"
-          ENV_VARS="${ENV_VARS},MODEL_VTO=${{ vars.MODEL_VTO || 'virtual-try-on-001' }}"
-          ENV_VARS="${ENV_VARS},MODEL_VIDEO=${{ vars.MODEL_VIDEO || 'veo-3.1-fast-generate-001' }}"
-          ENV_VARS="${ENV_VARS},MODEL_LIVE=${{ vars.MODEL_LIVE || 'gemini-3.8-live' }}"
-          ENV_VARS="${ENV_VARS},DEMO_MODE=${{ vars.DEMO_MODE || 'off' }}"
-          ENV_VARS="${ENV_VARS},DEMO_TIMEOUT_S=${{ vars.DEMO_TIMEOUT_S || '25' }}"
-          ENV_VARS="${ENV_VARS},ALLOWED_ORIGINS=https://threadandpixel.shop,https://www.threadandpixel.shop,http://localhost:3000"
+          ENV_VARS="${ENV_VARS}@GOOGLE_CLOUD_REGION=${REGION}"
+          ENV_VARS="${ENV_VARS}@ASSET_BUCKET=${ASSET_BUCKET}"
+          ENV_VARS="${ENV_VARS}@GEMINI_LOCATION=${{ vars.GEMINI_LOCATION || 'global' }}"
+          ENV_VARS="${ENV_VARS}@IMAGING_LOCATION=${{ vars.IMAGING_LOCATION || 'us-central1' }}"
+          ENV_VARS="${ENV_VARS}@LIVE_LOCATION=${{ vars.LIVE_LOCATION || 'us-central1' }}"
+          ENV_VARS="${ENV_VARS}@MODEL_FLASH=${{ vars.MODEL_FLASH || 'gemini-3.8-flash' }}"
+          ENV_VARS="${ENV_VARS}@MODEL_LITE=${{ vars.MODEL_LITE || 'gemini-3.5-flash-lite' }}"
+          ENV_VARS="${ENV_VARS}@MODEL_PRO=${{ vars.MODEL_PRO || 'gemini-3.1-pro-preview' }}"
+          ENV_VARS="${ENV_VARS}@MODEL_IMAGE=${{ vars.MODEL_IMAGE || 'gemini-nano-banana-2.1' }}"
+          ENV_VARS="${ENV_VARS}@MODEL_VTO=${{ vars.MODEL_VTO || 'virtual-try-on-001' }}"
+          ENV_VARS="${ENV_VARS}@MODEL_VIDEO=${{ vars.MODEL_VIDEO || 'veo-3.1-fast-generate-001' }}"
+          ENV_VARS="${ENV_VARS}@MODEL_LIVE=${{ vars.MODEL_LIVE || 'gemini-3.8-live' }}"
+          ENV_VARS="${ENV_VARS}@DEMO_MODE=${{ vars.DEMO_MODE || 'off' }}"
+          ENV_VARS="${ENV_VARS}@DEMO_TIMEOUT_S=${{ vars.DEMO_TIMEOUT_S || '25' }}"
+          ENV_VARS="${ENV_VARS}@ALLOWED_ORIGINS=https://threadandpixel.shop,https://www.threadandpixel.shop,http://localhost:3000"
 
           gcloud run deploy tp-api \
             --source ./api \
@@ -122,7 +122,7 @@ jobs:
             --memory 1Gi \
             --timeout 3600 \
             --min-instances "${MIN_INSTANCES}" \
-            --set-env-vars "${ENV_VARS}"
+            --set-env-vars "^@^${ENV_VARS}"
 
           API_URL=$(gcloud run services describe tp-api --project "${PROJECT_ID}" --region "${REGION}" --format="value(status.url)")
           echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
