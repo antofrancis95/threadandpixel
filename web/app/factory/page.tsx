@@ -62,7 +62,7 @@ export default function Factory() {
       <main className="factory">
         <header className="topbar">
           <h1>Factory portal</h1>
-          <Link href="/">Studio</Link>
+          <Link href="/studio">Studio</Link>
         </header>
         <section className="panel">
           {user && !user.isAnonymous ? (
