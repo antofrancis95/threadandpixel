@@ -32,7 +32,7 @@
   --shadow-hover: 0 20px 40px -8px rgba(35, 25, 15, 0.1);
   --shadow-gold: 0 6px 20px -2px rgba(197, 168, 128, 0.35);
 
-  --font-serif: "Playfair Display", Didot, "Bodoni MT", Georgia, "Times New Roman", serif;
+  --font-serif: var(--font-playfair), "Playfair Display", Didot, "Bodoni MT", Georgia, "Times New Roman", serif;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
   font-family: var(--font-sans);
@@ -2259,27 +2259,64 @@ button.composer-icon-btn.active {
   text-decoration: underline;
 }
 
-.auth-user-badge {
+.topbar-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--line);
+  margin: 0 0.3rem;
+  flex-shrink: 0;
+}
+
+.atelier-user-profile {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  font-size: 0.8rem;
-  color: var(--ink-secondary);
+  gap: 0.55rem;
+  padding: 0.25rem 0.35rem 0.25rem 0.45rem;
   background: var(--surface);
   border: 1px solid var(--line);
-  padding: 0.35rem 0.75rem;
   border-radius: var(--radius-full);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.user-avatar-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold-light) 0%, #D8C3A5 100%);
+  color: #5D431F;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 1px solid rgba(197, 168, 128, 0.4);
+  flex-shrink: 0;
+}
+
+.user-profile-info {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.user-profile-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
 }
 
 .auth-user-role {
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: 0.65rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   padding: 0.15rem 0.45rem;
   border-radius: var(--radius-full);
   background: var(--cream);
-  color: var(--ink-secondary);
+  color: var(--gold-dark);
+  border: 1px solid var(--gold-light);
 }
 
 .auth-user-role.admin {
@@ -2289,20 +2326,21 @@ button.composer-icon-btn.active {
 }
 
 .signout-nav-btn {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 500;
   color: var(--muted);
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid transparent;
   border-radius: var(--radius-full);
-  padding: 0.4rem 0.8rem;
+  padding: 0.25rem 0.55rem;
   cursor: pointer;
   transition: all 0.15s ease;
+  margin-left: 0.15rem;
 }
 
 .signout-nav-btn:hover {
   color: var(--rose);
-  border-color: var(--rose);
+  border-color: rgba(220, 38, 38, 0.2);
   background: var(--rose-light);
 }
 
@@ -2429,4 +2467,293 @@ button.composer-icon-btn.active {
 
 .auth-divider span {
   padding: 0 0.85rem;
+}
+
+
+/* =========================================================================
+   Landing design language carried into the studio and factory portal
+   ========================================================================= */
+
+/* Wordmark and headings in the editorial serif */
+.brand h1,
+.panel-head h2,
+.showcase-title,
+.drawer-head h3,
+.inline-widget-head h4,
+.factory h2,
+.factory h3 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+.brand a {
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+.brand h1 {
+  font-size: 1.45rem;
+}
+.panel-head h2,
+.showcase-title {
+  font-size: 1.12rem;
+  font-weight: 400;
+}
+.topbar {
+  background: rgba(250, 247, 242, 0.86);
+  border-bottom: 1px solid var(--line-light);
+}
+.topbar nav > a,
+.signout-nav-btn,
+.archive-trigger-btn {
+  font-size: 0.82rem;
+}
+
+/* Section kicker: hairline + tracked uppercase, as on the landing page */
+.atelier-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.atelier-kicker::before {
+  content: "";
+  width: 32px;
+  height: 1px;
+  background: var(--gold);
+}
+
+/* ---------- Auth gate: editorial two-column with the silk drape ---------- */
+.atelier-auth-gate {
+  justify-content: flex-start;
+  align-items: stretch;
+  padding: 0;
+  background: var(--bg);
+}
+.atelier-auth-gate::before {
+  display: none;
+}
+.atelier-auth-drape {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+.atelier-auth-drape svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.atelier-auth-drape::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, var(--bg) 0%, var(--bg) 42%, rgba(250, 247, 242, 0.55) 62%, rgba(250, 247, 242, 0.05) 100%),
+    linear-gradient(180deg, rgba(250, 247, 242, 0.5) 0%, transparent 30%, transparent 70%, var(--bg) 100%);
+}
+.atelier-auth-top {
+  position: relative;
+  z-index: 2;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(16px, 5vw, 96px);
+}
+.atelier-auth-top .brand h1 {
+  font-size: 1.35rem;
+  margin: 0;
+}
+.atelier-auth-top .back-link {
+  font-size: 0.82rem;
+  color: var(--ink-secondary);
+  text-decoration: none;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  transition: all 0.2s;
+}
+.atelier-auth-top .back-link:hover {
+  border-color: var(--line);
+  background: #fff;
+}
+.atelier-auth-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: clamp(1.5rem, 5vh, 4rem) clamp(16px, 5vw, 96px) clamp(3rem, 8vh, 6rem);
+}
+.atelier-auth-card {
+  margin: 0;
+  max-width: 460px;
+  text-align: left;
+  padding: 2.25rem 2.25rem 2rem;
+  border-radius: var(--radius-lg);
+  animation: authFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.atelier-auth-badge {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-bottom: 1.1rem;
+  gap: 0.75rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  color: var(--muted);
+}
+.atelier-auth-badge::before {
+  content: "";
+  width: 32px;
+  height: 1px;
+  background: var(--gold);
+}
+.atelier-auth-badge svg {
+  display: none;
+}
+.atelier-auth-badge.restricted {
+  color: var(--rose);
+}
+.atelier-auth-badge.restricted::before {
+  background: var(--rose);
+}
+.atelier-auth-title {
+  font-size: clamp(2.2rem, 3.4vw, 2.9rem);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  margin-bottom: 0.9rem;
+}
+.atelier-auth-desc {
+  font-size: 0.95rem;
+  color: var(--ink-secondary);
+  margin-bottom: 1.75rem;
+  text-wrap: pretty;
+}
+.auth-field label {
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+}
+.auth-input {
+  border-radius: var(--radius-full);
+  padding: 0.8rem 1.2rem;
+  background: #fff;
+}
+.auth-submit-btn {
+  border-radius: var(--radius-full);
+  background: linear-gradient(180deg, #2d2926 0%, #1a1817 100%);
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  box-shadow:
+    0 2px 4px rgba(26, 24, 23, 0.08),
+    0 4px 12px -2px rgba(26, 24, 23, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+.auth-submit-btn:hover {
+  border-color: var(--gold);
+}
+.google-signin-btn {
+  border-radius: var(--radius-full);
+  padding: 0.8rem 1.4rem;
+}
+.auth-divider {
+  margin: 1.25rem 0;
+}
+.atelier-auth-footer {
+  margin-top: 1.5rem;
+  padding-top: 1.1rem;
+}
+.atelier-auth-footer a {
+  color: var(--ink);
+}
+.atelier-auth-footer a::after {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 1px;
+  background: var(--gold);
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+.atelier-auth-gate .error-banner {
+  position: relative;
+}
+
+@media (max-width: 767px) {
+  .atelier-auth-top {
+    height: 60px;
+  }
+  .atelier-auth-top .back-link {
+    display: none;
+  }
+  .atelier-auth-body {
+    align-items: flex-start;
+  }
+  .atelier-auth-card {
+    padding: 1.75rem 1.4rem;
+  }
+  .atelier-auth-drape::after {
+    background: linear-gradient(180deg, rgba(250, 247, 242, 0.9) 0%, rgba(250, 247, 242, 0.85) 60%, var(--bg) 100%);
+  }
+}
+
+/* ---------- Factory portal shell ---------- */
+.factory .topbar {
+  margin: -1.5rem -2.5rem 1.5rem;
+  padding: 0 2.5rem;
+}
+.factory .topbar h1 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 1.45rem;
+  margin: 0;
+}
+.factory .topbar h1 span {
+  font-style: italic;
+  color: var(--gold);
+}
+.factory .live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--emerald);
+  font-weight: 600;
+}
+@media (max-width: 767px) {
+  .factory {
+    padding: 1rem;
+  }
+  .factory .topbar {
+    margin: -1rem -1rem 1rem;
+    padding: 0 1rem;
+  }
+}
+
+.factory-gate {
+  max-width: 560px;
+  gap: 0.75rem;
+  padding: 2rem 2.25rem;
+  align-items: flex-start;
+}
+.factory-gate h2 {
+  font-size: 1.9rem;
+  margin: 0;
+}
+.factory-gate .hint {
+  color: var(--ink-secondary);
+  margin: 0 0 0.5rem;
+}
+.factory-gate button.primary {
+  align-self: flex-start;
 }

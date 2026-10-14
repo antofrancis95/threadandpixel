@@ -498,3 +498,49 @@ export function PartyIcon({ size = 16, className, ...props }: IconProps) {
   );
 }
 
+export function MenswearIcon({ size = 16, className, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M8 3h8l2 5-2 13H8L6 8l2-5z" />
+      <path d="M8 3l4 8 4-8" />
+      <path d="M12 11v10" />
+      <path d="m6.5 8.5 3.5 1" />
+      <path d="m17.5 8.5-3.5 1" />
+      <line x1="14.5" y1="12" x2="17.5" y2="12" />
+      <circle cx="12" cy="14" r="0.75" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="17" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function WomenswearIcon({ size = 16, className, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M8 3h8l1.5 5-2.5 4v1l4 8H5l4-8v-1L6.5 8 8 3z" />
+      <path d="M9.5 3c0 2 1.2 3.5 2.5 3.5s2.5-1.5 2.5-3.5" />
+      <path d="M7 13h10" />
+    </svg>
+  );
+}

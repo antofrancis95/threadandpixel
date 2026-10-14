@@ -96,4 +96,5 @@ export type OrderDetail = {
 };
 
 export const SIZES = ["XS", "S", "M", "L", "XL", "XXL"] as const;
+export type Size = (typeof SIZES)[number];
 export const ORDER_STATUSES = ["new", "cutting", "sewing", "shipped"] as const;

@@ -124,27 +124,56 @@ def technical_flats(
     size: str | None = None,
 ) -> tuple[bytes, str]:
     effective_size = size or spec.size
-    prompt = (
-        "Create an architectural fashion technical flat sketch of this exact garment for a manufacturer's tech pack: "
-        "FRONT view on the left and BACK view on the right, side by side, clean black vector-style line drawing "
-        "on pure white background, no shading, no model, no colour fill. Show seams, darts, topstitching, "
-        f"closures ({', '.join(spec.closures) or 'none'}) and hem details clearly. Label 'FRONT' and 'BACK' only."
-    )
+    garment_type = spec.garment_type or "garment"
+    closures_desc = ", ".join(spec.closures) if spec.closures else "standard couture closures"
+
+    prompt_parts = [
+        "You are an expert haute couture apparel patternmaker and technical CAD designer. Generate an architectural, factory-production technical flat sketch (tech pack flat specification) for this exact garment shown in the reference image.",
+        "",
+        "LAYOUT & PRESENTATION:",
+        "- True 2D CAD technical vector flat lay (NO 3D perspective, NO angled views, perfectly symmetrical flat presentation).",
+        "- Side-by-side presentation: Complete FRONT view on the left, Complete BACK view on the right.",
+        "- Pristine, solid, pure white background (#FFFFFF).",
+        "- High-contrast black line art (#000000). ABSOLUTELY NO human bodies, NO faces, NO hair, NO mannequin dummy stands, NO grey shading, NO photographic textures, NO color fills.",
+        "",
+        "ARCHITECTURAL CONSTRUCTION DETAILS:",
+        f"- Garment Type: {garment_type.upper()}.",
+        f"- Closures & Finishes: {closures_desc}.",
+        "- Crisp outline contour lines (1.5pt solid black) defining the exact silhouette shape.",
+        "- Precise internal construction lines (1.0pt): neckline, lapels, collar roll, armholes, shoulder seams, side seams, waist seam, yoke, pleats, vents.",
+        "- Functional tailoring details: darts (bust/waist darts), pocket welts and flaps, placket, buttonhole placements, cuff buttons, hem allowances.",
+        "- Visible topstitching: fine dashed line work (0.75pt) along lapel edges, collars, plackets, pockets, and hem.",
+        "- Label 'FRONT' beneath the left sketch, and 'BACK' beneath the right sketch.",
+    ]
+
     if effective_size:
-        measurements = SIZE_MEASUREMENTS.get(spec.garment_type, {}).get(effective_size)
+        measurements = SIZE_MEASUREMENTS.get(garment_type, {}).get(effective_size) or SIZE_MEASUREMENTS.get("suit", {}).get(effective_size, {})
         if measurements:
             spec_lines = ", ".join(f"{k}: {v}" for k, v in measurements.items())
-            prompt += (
-                f"\n\nCRITICAL SPECIFICATION: This is Size {effective_size}. Include architectural technical flat measurement callouts: "
-                f"draw thin CAD dimension lines with measurement arrows and exact dimension labels ({spec_lines}) "
-                f"directly on the flat sketch to indicate tailoring proportions and garment dimensions for Size {effective_size}."
-            )
+            prompt_parts.extend([
+                "",
+                f"MANDATORY ARCHITECTURAL MEASUREMENT CALLOUTS FOR SIZE {effective_size}:",
+                f"The garment is tailored to SIZE {effective_size}. You MUST draw technical CAD dimension lines directly onto the flat sketch:",
+                f"1. Draw thin architectural dimension extension lines and leader lines with distinct double-ended dimension arrows across the key measurement points ({spec_lines}).",
+                "2. Render clearly legible dimension measurement text annotations next to each arrow (for example: horizontal arrow across chest with 'Chest: 54 cm', arrow across waist with 'Waist: 43 cm', vertical arrow along jacket/body length with 'Length: 76 cm', arrow along sleeve with 'Sleeve: 64 cm').",
+                f"3. Place a prominent specification title block at the top: 'SPECIFICATION TECH PACK — SIZE {effective_size}'.",
+            ])
         else:
-            prompt += (
-                f"\n\nCRITICAL SPECIFICATION: This is Size {effective_size}. Include architectural technical flat measurement callouts: "
-                f"draw thin CAD dimension lines with measurement arrows and numerical centimeter dimension labels for Size {effective_size} "
-                "directly on the flat sketch indicating width, length, and sleeve dimensions."
-            )
+            prompt_parts.extend([
+                "",
+                f"MANDATORY ARCHITECTURAL MEASUREMENT CALLOUTS FOR SIZE {effective_size}:",
+                f"The garment is tailored to SIZE {effective_size}. Draw thin CAD dimension lines with double-ended arrows and numerical centimeter labels for Size {effective_size} indicating chest width, waist width, length, and sleeve dimensions.",
+                f"Place a specification title block at the top: 'SPECIFICATION TECH PACK — SIZE {effective_size}'.",
+            ])
+    else:
+        prompt_parts.extend([
+            "",
+            "ARCHITECTURAL MEASUREMENT GUIDELINES:",
+            "Draw thin technical CAD dimension lines with leader arrows indicating key proportional tailoring landmarks (Chest width, Waist, Hip, Full Length, and Hem sweep) with standard proportional drafting callouts.",
+            "Place a specification title block at the top: 'SPECIFICATION TECH PACK — PROPORTIONAL DRAFT'.",
+        ])
+
+    prompt = "\n".join(prompt_parts)
 
     response = imaging().models.generate_content(
         model=settings.model_image,
@@ -152,3 +181,4 @@ def technical_flats(
         config=_IMAGE_CONFIG,
     )
     return extract_image(response)
+

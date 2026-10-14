@@ -20,6 +20,7 @@ import {
   ImageIcon,
   LockIcon,
   MannequinIcon,
+  MenswearIcon,
   MirrorIcon,
   PartyIcon,
   PlusIcon,
@@ -28,7 +29,9 @@ import {
   ScissorsIcon,
   ShieldCheckIcon,
   SparkleIcon,
+  WomenswearIcon,
 } from "@/components/icons";
+import { StaticDrape } from "@/components/landing/HeroCloth";
 import { LiveVoice } from "@/components/LiveVoice";
 import { ChatSkeleton, ShowcaseSkeleton } from "@/components/skeletons";
 import { CommissionCard } from "@/components/widgets/CommissionCard";
@@ -248,15 +251,20 @@ export default function AtelierStudio() {
     }
   }
 
-  async function generateFlats() {
+  async function generateFlats(chosenSize?: string) {
     if (!design) return;
     setBusy(true);
     setError(null);
     setActiveWidget(null);
     setAssetErrors((e) => ({ ...e, flats: false }));
+    const effectiveSize = chosenSize || design.spec.size || undefined;
     try {
-      const { flats_url } = await api.createFlats(design.design_id);
-      setDesign({ ...design, flats_url });
+      const res = await api.createFlats(design.design_id, effectiveSize);
+      setDesign({
+        ...design,
+        flats_url: res.flats_url,
+        spec: res.size ? { ...design.spec, size: res.size } : design.spec,
+      });
       setActiveTab("flats");
     } catch (e) {
       setError((e as Error).message);
@@ -496,15 +504,33 @@ export default function AtelierStudio() {
   if (!ready || (user && !user.isAnonymous && authChecking)) {
     return (
       <div className="atelier-auth-gate">
+        <div className="atelier-auth-drape" aria-hidden="true">
+          <StaticDrape />
+        </div>
+        <div className="atelier-auth-top">
+          <div className="brand">
+            <Link href="/">
+              <h1>
+                Thread <span>&amp;</span> Pixel
+              </h1>
+              <span className="atelier-tag">Haute Couture Atelier</span>
+            </Link>
+          </div>
+          <Link href="/" className="back-link">
+            &larr; Back to the atelier
+          </Link>
+        </div>
+        <div className="atelier-auth-body">
         <div className="atelier-auth-card">
           <div className="atelier-auth-badge">
             <SparkleIcon size={13} />
-            <span>Thread &amp; Pixel Atelier</span>
+            <span>Private salon</span>
           </div>
           <h2 className="atelier-auth-title">
-            Private <span>Salon</span>
+            One <span>moment</span>.
           </h2>
-          <p className="atelier-auth-desc">Verifying authorized couture credentials...</p>
+          <p className="atelier-auth-desc">Verifying your atelier credentials.</p>
+        </div>
         </div>
       </div>
     );
@@ -513,16 +539,34 @@ export default function AtelierStudio() {
   if (!user || user.isAnonymous) {
     return (
       <div className="atelier-auth-gate">
+        <div className="atelier-auth-drape" aria-hidden="true">
+          <StaticDrape />
+        </div>
+        <div className="atelier-auth-top">
+          <div className="brand">
+            <Link href="/">
+              <h1>
+                Thread <span>&amp;</span> Pixel
+              </h1>
+              <span className="atelier-tag">Haute Couture Atelier</span>
+            </Link>
+          </div>
+          <Link href="/" className="back-link">
+            &larr; Back to the atelier
+          </Link>
+        </div>
+        <div className="atelier-auth-body">
         <div className="atelier-auth-card">
           <div className="atelier-auth-badge">
             <LockIcon size={13} />
-            <span>Private Atelier Salon</span>
+            <span>Designer studio</span>
           </div>
           <h2 className="atelier-auth-title">
-            Thread <span>&amp;</span> Pixel
+            Enter the <span>studio</span>.
           </h2>
           <p className="atelier-auth-desc">
-            Haute Couture Atelier Studio. Enter your atelier credentials or sign in with Google to access conversational draping, runway synthesis, and precision technical packs.
+            Sign in with your atelier credentials or Google to consult the Master Couturier, draft flats, fit and
+            commission a piece. Access is by invitation.
           </p>
 
           {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
@@ -580,9 +624,10 @@ export default function AtelierStudio() {
           </button>
 
           <div className="atelier-auth-footer">
-            <span>Production operators:</span>
-            <Link href="/factory">Factory Portal &rarr;</Link>
+            <span>Tailoring units and factories</span>
+            <Link href="/factory">Factory Portal</Link>
           </div>
+        </div>
         </div>
       </div>
     );
@@ -591,6 +636,23 @@ export default function AtelierStudio() {
   if (!isAllowed) {
     return (
       <div className="atelier-auth-gate">
+        <div className="atelier-auth-drape" aria-hidden="true">
+          <StaticDrape />
+        </div>
+        <div className="atelier-auth-top">
+          <div className="brand">
+            <Link href="/">
+              <h1>
+                Thread <span>&amp;</span> Pixel
+              </h1>
+              <span className="atelier-tag">Haute Couture Atelier</span>
+            </Link>
+          </div>
+          <Link href="/" className="back-link">
+            &larr; Back to the atelier
+          </Link>
+        </div>
+        <div className="atelier-auth-body">
         <div className="atelier-auth-card">
           <div className="atelier-auth-badge restricted">
             <AlertTriangleIcon size={13} />
@@ -636,9 +698,10 @@ export default function AtelierStudio() {
           </div>
 
           <div className="atelier-auth-footer">
-            <span>Factory order management:</span>
-            <Link href="/factory">Factory Portal &rarr;</Link>
+            <span>Tailoring units and factories</span>
+            <Link href="/factory">Factory Portal</Link>
           </div>
+        </div>
         </div>
       </div>
     );
@@ -648,18 +711,21 @@ export default function AtelierStudio() {
     <div className="atelier-app">
       <header className="topbar">
         <div className="brand">
-          <h1>
-            Thread <span>&amp;</span> Pixel
-          </h1>
-          <span className="atelier-tag">Haute Couture Atelier</span>
+          <Link href="/" title="Thread & Pixel home">
+            <h1>
+              Thread <span>&amp;</span> Pixel
+            </h1>
+            <span className="atelier-tag">Haute Couture Atelier</span>
+          </Link>
         </div>
         <nav>
           {demoMode !== "off" && <span className="demo-badge">demo mode: {demoMode}</span>}
-          <div className="auth-user-badge" title={`Signed in as ${user.email}`}>
-            <ShieldCheckIcon size={14} />
-            <span>{user.email?.split("@")[0]}</span>
-            {userRole && <span className={`auth-user-role ${userRole}`}>{userRole}</span>}
-          </div>
+          {design && (
+            <button type="button" className="secondary new-commission-btn" onClick={startOver}>
+              <PlusIcon size={13} />
+              <span>New Commission</span>
+            </button>
+          )}
           <button
             type="button"
             className="archive-trigger-btn"
@@ -671,21 +737,25 @@ export default function AtelierStudio() {
             <ArchiveIcon size={14} />
             <span>Archive{pastDesigns.length > 0 ? ` (${pastDesigns.length})` : ""}</span>
           </button>
-          {design && (
-            <button type="button" className="secondary new-commission-btn" onClick={startOver}>
-              <PlusIcon size={13} />
-              <span>New Commission</span>
-            </button>
-          )}
           <Link href="/factory">Factory Portal</Link>
-          <button
-            type="button"
-            className="signout-nav-btn"
-            onClick={handleSignOut}
-            title="Sign out of Atelier Studio"
-          >
-            Sign Out
-          </button>
+          <div className="topbar-divider" />
+          <div className="atelier-user-profile" title={`Signed in as ${user.email}`}>
+            <div className="user-avatar-circle">
+              {(user.email?.[0] || "U").toUpperCase()}
+            </div>
+            <div className="user-profile-info">
+              <span className="user-profile-name">{user.email?.split("@")[0]}</span>
+              {userRole && <span className={`auth-user-role ${userRole}`}>{userRole}</span>}
+            </div>
+            <button
+              type="button"
+              className="signout-nav-btn"
+              onClick={handleSignOut}
+              title="Sign out of Atelier Studio"
+            >
+              Sign Out
+            </button>
+          </div>
         </nav>
       </header>
 
@@ -959,29 +1029,86 @@ export default function AtelierStudio() {
                   </div>
                 ) : activeTab === "flats" ? (
                   design.flats_url ? (
-                    <img
-                      src={design.flats_url}
-                      alt="Technical flat sketch"
-                      onError={() => setAssetErrors((e) => ({ ...e, flats: true }))}
-                    />
+                    <div>
+                      <img
+                        src={design.flats_url}
+                        alt="Technical flat sketch"
+                        onError={() => setAssetErrors((e) => ({ ...e, flats: true }))}
+                      />
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "0.5rem 0.8rem",
+                          background: "var(--cream)",
+                          borderRadius: "var(--radius-sm)",
+                          marginTop: "0.6rem",
+                          border: "1px solid var(--line-light)",
+                          flexWrap: "wrap",
+                          gap: "0.4rem",
+                        }}
+                      >
+                        <span style={{ fontSize: "0.78rem", color: "var(--ink-secondary)" }}>
+                          Calibrated: <strong style={{ color: "var(--gold-dark)" }}>{design.spec.size ? `Size ${design.spec.size}` : "Proportional Draft"}</strong>
+                        </span>
+                        <div style={{ display: "flex", gap: "0.3rem", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.72rem", color: "var(--muted)", marginRight: "0.2rem" }}>Re-calibrate:</span>
+                          {(["XS", "S", "M", "L", "XL", "XXL"] as const).map((sz) => (
+                            <button
+                              key={sz}
+                              type="button"
+                              className={`chip-btn ${design.spec.size === sz ? "highlight" : ""}`}
+                              style={{ padding: "0.2rem 0.45rem", fontSize: "0.72rem" }}
+                              onClick={() => generateFlats(sz)}
+                              disabled={busy}
+                            >
+                              {sz}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   ) : (
                     <div className="asset-empty-state">
                       <div className="asset-empty-icon-ring">
                         <RulerIcon size={26} />
                       </div>
-                      <span className="mannequin-badge">✦ Technical Drawing</span>
-                      <h3 className="asset-empty-title">Technical Flats Not Yet Drafted</h3>
+                      <span className="mannequin-badge">✦ Technical Drawing &amp; CAD Measurements</span>
+                      <h3 className="asset-empty-title">Draft Architectural Technical Flats</h3>
                       <p className="asset-empty-desc">
-                        Generate 2D architectural flat sketches displaying precise seam lines, hem proportions, pocket placements, and construction stitching.
+                        Select your size to calibrate precision CAD dimension lines and tailoring measurements:
                       </p>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "0.45rem",
+                          flexWrap: "wrap",
+                          justifyContent: "center",
+                          margin: "0.8rem 0 1.2rem",
+                        }}
+                      >
+                        {(["XS", "S", "M", "L", "XL", "XXL"] as const).map((sz) => (
+                          <button
+                            key={sz}
+                            type="button"
+                            className={`chip-btn ${design.spec.size === sz ? "highlight" : ""}`}
+                            style={{ padding: "0.45rem 0.85rem", fontSize: "0.82rem", fontWeight: 600 }}
+                            onClick={() => generateFlats(sz)}
+                            disabled={busy}
+                          >
+                            Size {sz}
+                          </button>
+                        ))}
+                      </div>
                       <button
                         type="button"
-                        className="primary"
-                        onClick={generateFlats}
+                        className="secondary"
+                        style={{ fontSize: "0.8rem", color: "var(--ink-secondary)" }}
+                        onClick={() => generateFlats()}
                         disabled={busy}
                       >
-                        <RulerIcon size={14} />
-                        <span>{busy ? "Drafting Technical Flats…" : "Draft Technical Flats"}</span>
+                        I&apos;m not sure about my size · Draft with standard proportions
                       </button>
                     </div>
                   )
@@ -1107,8 +1234,18 @@ export default function AtelierStudio() {
                   </span>
                 )}
                 {design.spec.gender && (
-                  <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 600 }}>
-                    {design.spec.gender === "menswear" ? "👔 Menswear" : "👗 Womenswear"}
+                  <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                    {design.spec.gender === "menswear" ? (
+                      <>
+                        <MenswearIcon size={12} />
+                        <span>Menswear</span>
+                      </>
+                    ) : (
+                      <>
+                        <WomenswearIcon size={12} />
+                        <span>Womenswear</span>
+                      </>
+                    )}
                   </span>
                 )}
                 {design.spec.size && (
@@ -1172,7 +1309,12 @@ export default function AtelierStudio() {
                 <button
                   type="button"
                   className="showcase-action-btn"
-                  onClick={() => (design.flats_url ? setActiveTab("flats") : generateFlats())}
+                  onClick={() => {
+                    setActiveTab("flats");
+                    if (!design.flats_url && design.spec.size) {
+                      generateFlats(design.spec.size);
+                    }
+                  }}
                   disabled={busy}
                 >
                   <RulerIcon size={14} />

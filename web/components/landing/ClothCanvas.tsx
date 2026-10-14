@@ -155,10 +155,18 @@ export default function ClothCanvas({ host }: { host: RefObject<HTMLElement | nu
     let targetStrength = 1.6; // opening burst
     let interacting = false;
     let idleT = 0;
+    // The headline sits over the left ~55% of the hero, where the drape is washed
+    // out by the overlay. Only follow the cursor on the right side; over the text
+    // the ripple keeps its own slow wander so the motion stays visible.
+    const FOLLOW_FROM = 0.1; // normalised x (-1..1); roughly 55% across
     function onMove(e: PointerEvent) {
       const r = mount.getBoundingClientRect();
       const nx = ((e.clientX - r.left) / r.width) * 2 - 1;
       const ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+      if (nx < FOLLOW_FROM) {
+        interacting = false;
+        return;
+      }
       target.set(nx * halfW * 0.8, ny * halfH * 0.8);
       targetStrength = 1;
       interacting = true;

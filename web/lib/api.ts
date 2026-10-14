@@ -1,5 +1,5 @@
 import type { Auth } from "firebase/auth";
-import type { Design, DesignSummary, Job, Measurements, OrderDetail, QuoteResponse } from "./types";
+import type { Design, DesignSummary, Job, Measurements, OrderDetail, QuoteResponse, Size } from "./types";
 
 export type MessageInput = {
   text?: string;
@@ -58,7 +58,10 @@ export function createApi(baseUrl: string, auth: Auth) {
     listDesigns: () => request<DesignSummary[]>("/designs"),
     getDesign: (id: string) => request<Design>(`/designs/${encodeURIComponent(id)}`),
     sendMessage: (id: string, msg: MessageInput) => post<Design>(`/designs/${encodeURIComponent(id)}/messages`, msg),
-    createFlats: (id: string) => post<{ flats_url: string }>(`/designs/${encodeURIComponent(id)}/flats`),
+    createFlats: (id: string, size?: Size | string) =>
+      post<{ flats_url: string; size?: Size }>(
+        `/designs/${encodeURIComponent(id)}/flats${size ? `?size=${encodeURIComponent(size)}` : ""}`,
+      ),
     uploadPerson: (file: File) => {
       const form = new FormData();
       form.append("file", file);

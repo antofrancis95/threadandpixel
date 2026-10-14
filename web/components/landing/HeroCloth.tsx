@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 const ClothCanvas = dynamic(() => import("./ClothCanvas"), { ssr: false });
 
 /** Static drape used before the 3D loads, on phones, and under prefers-reduced-motion. */
-function StaticDrape() {
+export function StaticDrape() {
   return (
     <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
       <defs>

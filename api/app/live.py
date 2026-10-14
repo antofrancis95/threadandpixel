@@ -94,6 +94,11 @@ SYSTEM_PROMPT = """You are "The Master Couturier" at Thread & Pixel, speaking li
 - You have dedicated atelier tools to craft every aspect of the experience:
   1. update_design: call this once basic details are gathered to sketch the garment. Include gender ('menswear' or 'womenswear'), size ('XS', 'S', 'M', 'L', 'XL', 'XXL' if known), and fit (e.g. 'slim fit', 'tailored', 'relaxed'). When size is provided, technical flats with exact measurement callouts will automatically be drafted alongside the sketch.
   2. draft_flats: call this whenever the client asks for technical flats, 2D sketches, patterns, seam lines, or construction drawings.
+     - CAPTURING SIZE BEFORE DRAFTING FLATS (CRITICAL):
+       Check if the client's size is known.
+       * If size is NOT known yet: ask the client in spoken voice for their sizing first: 'To calibrate your architectural technical flats with exact tailoring measurements, which size would you like us to draft (XS, S, M, L, XL, or XXL)? If you are unsure of your size, simply let me know and I will draft standard proportional flats for you.'
+       * If client gives their size (e.g. 'Size Large' or 'M'): call draft_flats with size=... (e.g. size='L'), verbally acknowledging their bespoke size choice.
+       * If client says they are not sure, does not know their size, or asks to proceed anyway: call draft_flats immediately (using standard size M) so the client flow is never stalled.
   3. open_fitting: call this whenever the client wants to try on the garment, see it on themselves, or step into the virtual fitting room / salon mirror.
   4. generate_runway: call this whenever the client asks for a runway video, motion clip, fashion film, or runway demonstration.
   5. open_design_upload: call this whenever the client mentions having a design in mind, a sketch, or asks to upload an image of a design to generate an outfit based on it.
@@ -138,10 +143,16 @@ UPDATE_DESIGN = types.FunctionDeclaration(
 
 DRAFT_FLATS = types.FunctionDeclaration(
     name="draft_flats",
-    description="Draft 2D architectural technical flat sketches showing precise seam lines, hem, closures, and construction stitching for the current design.",
+    description="Draft 2D architectural technical flat sketches showing precise seam lines, hem, closures, and construction stitching for the current design. Include size if specified.",
     parameters=types.Schema(
         type="OBJECT",
-        properties={},
+        properties={
+            "size": types.Schema(
+                type="STRING",
+                description="Garment size for measurement callouts ('XS', 'S', 'M', 'L', 'XL', 'XXL') if known or specified by client.",
+                enum=["XS", "S", "M", "L", "XL", "XXL"],
+            ),
+        },
     ),
 )
 
@@ -425,11 +436,13 @@ async def live_session(ws: WebSocket):
                             except (ConnectionClosed, genai_errors.APIError):
                                 return
 
+                            size_arg = args.get("size")
                             async def _run_flats_bg():
                                 try:
-                                    flats = await asyncio.to_thread(generate_flats_service, user, state["design_id"])
+                                    flats = await asyncio.to_thread(generate_flats_service, user, state["design_id"], size=size_arg)
                                     await send({"type": "flats", "flats_url": flats["flats_url"]})
-                                    notice = "[ATELIER UPDATE]: The 2D architectural technical flat sketches with seam lines and measurements are now ready on the showcase board. Speak 1 short spoken sentence inviting the client to inspect them."
+                                    size_text = f" and Size {size_arg} measurements" if size_arg else ""
+                                    notice = f"[ATELIER UPDATE]: The 2D architectural technical flat sketches with seam lines{size_text} are now ready on the showcase board. Speak 1 short spoken sentence inviting the client to inspect them."
                                     try:
                                         await session.send_realtime_input(text=notice)
                                     except Exception as exc:

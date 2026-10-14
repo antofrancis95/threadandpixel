@@ -7,10 +7,12 @@ import {
   FilmIcon,
   ImageIcon,
   MannequinIcon,
+  MenswearIcon,
   MirrorIcon,
   PartyIcon,
   ScissorsIcon,
   SparkleIcon,
+  WomenswearIcon,
 } from "@/components/icons";
 import type { MessageInput } from "@/lib/api";
 import type { AtelierAction, ChatMessage } from "@/lib/types";
@@ -170,7 +172,7 @@ export function Chat({
                         onSend({ text: "Tailor this piece for a gentleman (menswear)." });
                       }}
                     >
-                      <MannequinIcon size={13} />
+                      <MenswearIcon size={13} />
                       <span>Gentleman · Menswear</span>
                     </button>
                     <button
@@ -187,7 +189,7 @@ export function Chat({
                         onSend({ text: "Tailor this piece for a lady (womenswear)." });
                       }}
                     >
-                      <SparkleIcon size={13} />
+                      <WomenswearIcon size={13} />
                       <span>Lady · Womenswear</span>
                     </button>
                   </div>

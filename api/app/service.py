@@ -500,8 +500,13 @@ def generate_flats_service(user: User, design_id: str, size: str | None = None) 
     path = storage.upload(
         f"designs/{ref.id}/flats-v{data['current_version']}.{EXT.get(out_mime, 'png')}", image, out_mime
     )
-    ref.update({"flats_path": path})
-    return {"flats_url": storage.signed_url(path)}
+    updates: dict = {"flats_path": path}
+    if size and not spec.size:
+        spec.size = size
+        updates["spec"] = spec.model_dump()
+        updates["size"] = size
+    ref.update(updates)
+    return {"flats_url": storage.signed_url(path), "size": effective_size}
 
 
 def job_response(job_id: str, job: dict) -> dict:

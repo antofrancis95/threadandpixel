@@ -61,10 +61,21 @@ export default function Factory() {
     return (
       <main className="factory">
         <header className="topbar">
-          <h1>Factory portal</h1>
-          <Link href="/studio">Studio</Link>
+          <h1>
+            Thread <span>&amp;</span> Pixel <span className="atelier-tag">Factory Portal</span>
+          </h1>
+          <nav>
+            <Link href="/">Home</Link>
+            <Link href="/studio">Studio</Link>
+          </nav>
         </header>
-        <section className="panel">
+        <section className="panel factory-gate">
+          <p className="atelier-kicker">Factory Portal</p>
+          <h2>Orders, live from the studio.</h2>
+          <p className="hint">
+            Sign in with the factory account to receive commissions with their spec, measurements, flats and quote,
+            and move each one from new to cutting, sewing and shipped.
+          </p>
           {user && !user.isAnonymous ? (
             <>
               <p>

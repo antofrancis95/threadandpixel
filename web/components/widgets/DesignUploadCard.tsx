@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CameraIcon, CloseIcon, ImageIcon, MannequinIcon, SparkleIcon } from "@/components/icons";
+import { CameraIcon, CloseIcon, ImageIcon, MannequinIcon, MenswearIcon, SparkleIcon, WomenswearIcon } from "@/components/icons";
 import { SIZES } from "@/lib/types";
 
 export function DesignUploadCard({
@@ -98,7 +98,7 @@ export function DesignUploadCard({
             disabled={busy}
             style={{ padding: "0.38rem 0.75rem", fontSize: "0.8rem" }}
           >
-            <SparkleIcon size={12} />
+            <WomenswearIcon size={13} />
             <span>Lady · Womenswear</span>
           </button>
           <button
@@ -108,7 +108,7 @@ export function DesignUploadCard({
             disabled={busy}
             style={{ padding: "0.38rem 0.75rem", fontSize: "0.8rem" }}
           >
-            <MannequinIcon size={12} />
+            <MenswearIcon size={13} />
             <span>Gentleman · Menswear</span>
           </button>
           <button
