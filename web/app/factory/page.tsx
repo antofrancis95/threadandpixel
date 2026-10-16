@@ -122,21 +122,21 @@ export default function Factory() {
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id} onClick={() => open(o.id)} className={selected?.order_id === o.id ? "active" : ""}>
-                  <td>#{o.id.slice(0, 8)}</td>
-                  <td>
+                  <td className="col-id">#{o.id.slice(0, 8)}</td>
+                  <td className="col-garment">
                     <span className="swatch" style={{ background: o.spec.color_hex }} /> {o.spec.garment_type} ·{" "}
                     {o.spec.fabric_id}
                   </td>
-                  <td>{o.size}</td>
-                  <td>${o.total.toFixed(2)}</td>
-                  <td>
+                  <td className="col-size" data-label="Size">{o.size}</td>
+                  <td className="col-total" data-label="Total">${o.total.toFixed(2)}</td>
+                  <td className="col-status">
                     <span className={`status ${o.status}`}>{o.status}</span>
                   </td>
                 </tr>
               ))}
               {orders.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="hint">
+                  <td colSpan={5} className="hint col-empty">
                     Waiting for orders…
                   </td>
                 </tr>

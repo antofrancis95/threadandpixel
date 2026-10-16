@@ -11,6 +11,7 @@ import {
   MirrorIcon,
   PartyIcon,
   ScissorsIcon,
+  SendIcon,
   SparkleIcon,
   WomenswearIcon,
 } from "@/components/icons";
@@ -68,7 +69,7 @@ export function Chat({
       <div className="panel-head">
         <div>
           <h2>The Couturier</h2>
-          <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Bespoke Couture Consultation</span>
+          <span className="panel-subtitle" style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Bespoke Couture Consultation</span>
         </div>
         {headerAction}
       </div>
@@ -460,8 +461,9 @@ export function Chat({
           maxLength={2000}
           disabled={busy}
         />
-        <button type="submit" className="primary" disabled={busy || !text.trim()}>
-          Send
+        <button type="submit" className="primary composer-send-btn" disabled={busy || !text.trim()} aria-label="Send">
+          <SendIcon size={17} className="composer-send-icon" />
+          <span className="composer-send-label">Send</span>
         </button>
       </form>
     </section>

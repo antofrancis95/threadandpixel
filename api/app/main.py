@@ -13,7 +13,7 @@ from .ai.common import AIError
 from .auth import User, current_user, verify_token
 from .clients import db
 from .config import settings
-from .models import DesignSpec, MessageIn, OrderIn, PhotoCheck, TechPackCritique, TechPackIn, TryOnIn
+from .models import DesignSpec, FlatsIn, MessageIn, OrderIn, PhotoCheck, TechPackCritique, TechPackIn, TryOnIn
 from .service import (
     EXT,
     continue_design,
@@ -192,8 +192,14 @@ def post_message(design_id: str, body: MessageIn, user: User = Depends(current_u
 
 
 @app.post("/designs/{design_id}/flats")
-def create_flats(design_id: str, size: str | None = None, user: User = Depends(current_user)):
-    return generate_flats_service(user, design_id, size=size)
+def create_flats(
+    design_id: str,
+    size: str | None = None,
+    body: FlatsIn | None = None,
+    user: User = Depends(current_user),
+):
+    measurements = body.measurements.model_dump(exclude_none=True) if body and body.measurements else None
+    return generate_flats_service(user, design_id, size=size, measurements=measurements)
 
 
 @app.post("/uploads/person")

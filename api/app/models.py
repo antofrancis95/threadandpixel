@@ -76,6 +76,10 @@ class Measurements(BaseModel):
     height_cm: float | None = Field(default=None, ge=100, le=230)
 
 
+class FlatsIn(BaseModel):
+    measurements: Measurements | None = None
+
+
 class TechPackIn(BaseModel):
     size: Size
     measurements: Measurements | None = None

@@ -1,0 +1,64 @@
+{
+ "render": {
+  "src": "/landing/render.jpg",
+  "width": 896,
+  "height": 1200,
+  "webp": [
+   {
+    "src": "/landing/render-480.webp",
+    "width": 480
+   },
+   {
+    "src": "/landing/render-800.webp",
+    "width": 800
+   }
+  ]
+ },
+ "flats": {
+  "src": "/landing/flats.jpg",
+  "width": 896,
+  "height": 1200,
+  "webp": [
+   {
+    "src": "/landing/flats-480.webp",
+    "width": 480
+   },
+   {
+    "src": "/landing/flats-800.webp",
+    "width": 800
+   }
+  ]
+ },
+ "tryon": {
+  "src": "/landing/tryon.jpg",
+  "width": 896,
+  "height": 1200,
+  "webp": [
+   {
+    "src": "/landing/tryon-480.webp",
+    "width": 480
+   },
+   {
+    "src": "/landing/tryon-800.webp",
+    "width": 800
+   }
+  ]
+ },
+ "runway-still": {
+  "src": "/landing/runway-still.jpg",
+  "width": 768,
+  "height": 1376,
+  "webp": [
+   {
+    "src": "/landing/runway-still-480.webp",
+    "width": 480
+   }
+  ]
+ },
+ "runway": {
+  "src": "/landing/runway.mp4",
+  "width": 720,
+  "height": 1280,
+  "optimised": true
+ }
+}

@@ -92,7 +92,15 @@ export default function ClothCanvas({ host }: { host: RefObject<HTMLElement | nu
     const mount: HTMLDivElement = mountEl;
     const hero: HTMLElement = heroEl;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "low-power" });
+    // The plane extends past the viewport on every side, so there are no edges to
+    // smooth: multisampling would only cost fill rate on high-DPI screens.
+    const renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      alpha: true,
+      powerPreference: "low-power",
+      stencil: false,
+      depth: false,
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setClearColor(0x000000, 0);
     mount.appendChild(renderer.domElement);

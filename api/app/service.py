@@ -82,10 +82,10 @@ def design_response(
     }
 
 
-def create_design(user: User, msg: MessageIn) -> dict:
+def create_design(user: User, msg: MessageIn, force_sketch: bool = False) -> dict:
     turn = demo.model(
         "tailor-create",
-        lambda: tailor.converse(msg, [], None, explicit_gender=msg.gender),
+        lambda: tailor.converse(msg, [], None, explicit_gender=msg.gender, force_sketch=force_sketch),
         TailorTurn,
     )
     ref = db().collection("designs").document()
@@ -359,7 +359,7 @@ def create_design_for_occasion(
     return design_response(ref.id, data, turn.reply_to_user, turn.user_transcript, turn.suggested_action)
 
 
-def continue_design(user: User, design_id: str, msg: MessageIn) -> dict:
+def continue_design(user: User, design_id: str, msg: MessageIn, force_sketch: bool = False) -> dict:
     ref, data = owned_design(design_id, user)
     existing_person_path = data.get("person_upload_path")
     if not existing_person_path:
@@ -371,7 +371,9 @@ def continue_design(user: User, design_id: str, msg: MessageIn) -> dict:
     spec = DesignSpec.model_validate(data["spec"])
     turn = demo.model(
         "tailor-edit",
-        lambda: tailor.converse(msg, history(ref), spec, has_vto=has_vto, explicit_gender=msg.gender),
+        lambda: tailor.converse(
+            msg, history(ref), spec, has_vto=has_vto, explicit_gender=msg.gender, force_sketch=force_sketch
+        ),
         TailorTurn,
     )
 
@@ -488,20 +490,30 @@ def continue_design(user: User, design_id: str, msg: MessageIn) -> dict:
     return design_response(ref.id, data | updates, turn.reply_to_user, turn.user_transcript, turn.suggested_action)
 
 
-def generate_flats_service(user: User, design_id: str, size: str | None = None) -> dict:
-    """Drafts 2D architectural technical flats for a design."""
+def generate_flats_service(
+    user: User, design_id: str, size: str | None = None, measurements: dict | None = None
+) -> dict:
+    """Drafts 2D architectural technical flats for a design.
+
+    Client tape measurements are kept with the flats so a re-draft at the same size stays consistent with them;
+    choosing a different size drops them, since they no longer describe that size.
+    """
     ref, data = owned_design(design_id, user)
     if not data.get("current_image_path"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Garment must be sketched before drafting technical flats.")
     current, mime = storage.download(data["current_image_path"])
     spec = DesignSpec.model_validate(data["spec"])
     effective_size = size or spec.size or data.get("size")
-    image, out_mime = demo.image("flats", lambda: designer.technical_flats(current, mime, spec, size=effective_size))
+    if measurements is None and data.get("flats_measurements") and data.get("flats_size") == effective_size:
+        measurements = data["flats_measurements"]
+    image, out_mime = demo.image(
+        "flats", lambda: designer.technical_flats(current, mime, spec, size=effective_size, measurements=measurements)
+    )
     path = storage.upload(
         f"designs/{ref.id}/flats-v{data['current_version']}.{EXT.get(out_mime, 'png')}", image, out_mime
     )
-    updates: dict = {"flats_path": path}
-    if size and not spec.size:
+    updates: dict = {"flats_path": path, "flats_size": effective_size, "flats_measurements": measurements or None}
+    if size and spec.size != size:
         spec.size = size
         updates["spec"] = spec.model_dump()
         updates["size"] = size

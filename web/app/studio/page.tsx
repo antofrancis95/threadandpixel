@@ -14,13 +14,17 @@ import { ErrorAlert } from "@/components/ErrorAlert";
 import {
   AlertTriangleIcon,
   ArchiveIcon,
+  ChatIcon,
   ClipboardIcon,
+  CloseIcon,
   FilmIcon,
+  GalleryIcon,
   GoogleIcon,
   ImageIcon,
   LockIcon,
   MannequinIcon,
   MenswearIcon,
+  MenuIcon,
   MirrorIcon,
   PartyIcon,
   PlusIcon,
@@ -54,6 +58,7 @@ import type {
 const STORAGE_KEY = "tp.designId";
 
 type ShowcaseTab = "editorial" | "flats" | "tryon" | "runway";
+type MobilePane = "chat" | "showcase";
 
 export default function AtelierStudio() {
   const { auth, api, user, ready } = useApp();
@@ -93,6 +98,47 @@ export default function AtelierStudio() {
   const [voiceVolume, setVoiceVolume] = useState(0);
   const [voiceDesigning, setVoiceDesigning] = useState(false);
   const liveVoiceRef = useRef<LiveVoiceHandle | null>(null);
+
+  // Mobile shell: on phones the chat and the showcase are two full-height
+  // panes behind a segmented switcher (see globals.css, max-width 767px).
+  const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const assetSignatureRef = useRef<string | null>(null);
+
+  // Widgets render inside the conversation stream, so opening one from the
+  // showcase (or from a voice command) must bring the chat pane forward.
+  useEffect(() => {
+    if (activeWidget) setMobilePane("chat");
+  }, [activeWidget]);
+
+  // A freshly rendered asset brings the showcase forward. The signature is
+  // seeded once the salon history is restored so a reload does not jump.
+  useEffect(() => {
+    const signature = design
+      ? [design.image_url, design.flats_url, design.tryon_url, design.runway_url].join("|")
+      : "";
+    if (initialLoading) return;
+    if (assetSignatureRef.current === null) {
+      assetSignatureRef.current = signature;
+      return;
+    }
+    if (signature !== assetSignatureRef.current) {
+      assetSignatureRef.current = signature;
+      if (design?.image_url) setMobilePane("showcase");
+    }
+  }, [design, initialLoading]);
+
+  // Close the mobile menu sheet when the viewport grows back to desktop.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const mq = window.matchMedia("(min-width: 768px)");
+    const onChange = () => {
+      if (mq.matches) setMenuOpen(false);
+    };
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [menuOpen]);
 
   useEffect(() => {
     api.health().then((h) => setDemoMode(h.demo_mode)).catch(() => {});
@@ -250,6 +296,11 @@ export default function AtelierStudio() {
     }
   }
 
+  // Voice mode: tell the live Couturier about something the client did with clicks so it can speak about it.
+  function tellVoice(text: string) {
+    if (liveVoiceRef.current?.isActive()) liveVoiceRef.current.sendMessage(text);
+  }
+
   async function generateFlats(chosenSize?: string) {
     if (!design) return;
     setBusy(true);
@@ -265,33 +316,74 @@ export default function AtelierStudio() {
         spec: res.size ? { ...design.spec, size: res.size } : design.spec,
       });
       setActiveTab("flats");
+      tellVoice(
+        `[ATELIER UPDATE]: The technical flats${effectiveSize ? ` for size ${effectiveSize}` : ""} are now ready on the showcase board. ` +
+          `Speak 1 short, warm sentence inviting the client to inspect them.`,
+      );
     } catch (e) {
       setError((e as Error).message);
+      tellVoice(
+        `[ATELIER UPDATE]: Drafting the flats failed and nothing new is on the showcase board. Do NOT say it is ready. ` +
+          `Speak 1 short sentence apologising and offering to try again.`,
+      );
     } finally {
       setBusy(false);
     }
   }
 
   async function handleApplyMeasurements(size: string, measurements?: Measurements) {
-    if (!design) return;
+    if (!design || quoteBusy) return;
     setQuoteBusy(true);
+    setBusy(true);
     setError(null);
+    setActiveTab("flats");
+    setAssetErrors((e) => ({ ...e, flats: false }));
+    tellVoice(
+      `[ATELIER EVENT]: The client just applied size ${size} with their bespoke tape measurements. ` +
+        `Speak 1 short, warm sentence confirming you are recalibrating the technical flats and tech pack to those exact measurements.`,
+    );
     try {
-      const res = await api.techpack(design.design_id, size, measurements);
-      setQuoteData(res);
+      // The flats must carry the same numbers the client confirmed, so both are calibrated from one tape.
+      const [flats, quote] = await Promise.all([
+        api.createFlats(design.design_id, size, measurements),
+        api.techpack(design.design_id, size, measurements),
+      ]);
+      setDesign({ ...design, flats_url: flats.flats_url, spec: { ...design.spec, size: size as typeof design.spec.size } });
+      setQuoteData(quote);
       setActiveWidget("commission");
+      tellVoice(
+        `[ATELIER UPDATE]: The technical flats for size ${size} have been redrafted to the client's measurements and the tech pack and quote are ready on the showcase board. ` +
+          `Speak 1 short, warm sentence telling the client so.`,
+      );
     } catch (e) {
       setError((e as Error).message);
+      tellVoice(
+        `[ATELIER UPDATE]: Recalibrating the flats failed and nothing changed on the showcase board. Do NOT say it is ready. ` +
+          `Speak 1 short sentence apologising and offering to try again.`,
+      );
     } finally {
       setQuoteBusy(false);
+      setBusy(false);
     }
   }
 
   async function handleTryonUpload(file: File) {
-    if (!design) return;
+    if (!design || tryonBusy) return;
     setTryonBusy(true);
     setError(null);
     setAssetErrors((e) => ({ ...e, tryon: false }));
+    setActiveTab("tryon");
+    setMessages((m) => [
+      ...m,
+      {
+        role: "model",
+        text: "Thank you, I have received your portrait. I am draping this creation onto you in the salon mirror now. This takes a moment.",
+      },
+    ]);
+    tellVoice(
+      `[ATELIER EVENT]: The client just uploaded their portrait ('${file.name}') for the virtual fitting room. ` +
+        `Speak 1 short, warm sentence acknowledging receipt and telling them you are draping the garment onto them in the salon mirror now, and it will take a moment.`,
+    );
     try {
       const { upload_id } = await api.uploadPerson(file);
       const { tryon_url } = await api.tryOn(design.design_id, upload_id);
@@ -305,18 +397,31 @@ export default function AtelierStudio() {
           text: "I have draped this bespoke creation onto your portrait in the salon mirror. You may inspect the fit on the showcase board.",
         },
       ]);
+      tellVoice(
+        `[ATELIER UPDATE]: The garment has been draped onto the client's portrait and is now ready in the Fitting tab of the showcase board. ` +
+          `Speak 1 short, warm sentence inviting the client to inspect the fit.`,
+      );
     } catch (e) {
       setError((e as Error).message);
+      tellVoice(
+        `[ATELIER UPDATE]: The virtual fitting failed (${(e as Error).message}) and nothing new is on the showcase board. Do NOT say it is ready. ` +
+          `Speak 1 short sentence apologising and inviting the client to upload a clear, full-length, front-facing portrait to try again.`,
+      );
     } finally {
       setTryonBusy(false);
     }
   }
 
   async function handleDrapeExisting() {
-    if (!design) return;
+    if (!design || tryonBusy) return;
     setTryonBusy(true);
     setError(null);
     setAssetErrors((e) => ({ ...e, tryon: false }));
+    setActiveTab("tryon");
+    tellVoice(
+      `[ATELIER EVENT]: The client asked to drape the current design onto their saved portrait. ` +
+        `Speak 1 short, warm sentence telling them you are draping it in the salon mirror now.`,
+    );
     try {
       const { tryon_url } = await api.tryOn(design.design_id);
       setDesign({ ...design, tryon_url, runway_url: null, has_vto_portrait: true });
@@ -329,8 +434,16 @@ export default function AtelierStudio() {
           text: "I have draped this updated silhouette onto your saved portrait in the salon mirror.",
         },
       ]);
+      tellVoice(
+        `[ATELIER UPDATE]: The garment has been draped onto the client's saved portrait and is ready in the Fitting tab. ` +
+          `Speak 1 short, warm sentence inviting the client to inspect the fit.`,
+      );
     } catch (e) {
       setError((e as Error).message);
+      tellVoice(
+        `[ATELIER UPDATE]: The virtual fitting failed and nothing new is on the showcase board. Do NOT say it is ready. ` +
+          `Speak 1 short sentence apologising and offering to try again.`,
+      );
     } finally {
       setTryonBusy(false);
     }
@@ -388,6 +501,10 @@ export default function AtelierStudio() {
       loadArchive();
     } catch (e) {
       setError((e as Error).message);
+      tellVoice(
+        `[ATELIER UPDATE]: The design could not be completed and nothing new is on the showcase board. Do NOT say it is ready. ` +
+          `Speak 1 short sentence apologising and inviting the client to try again.`,
+      );
     } finally {
       setBusy(false);
     }
@@ -452,6 +569,10 @@ export default function AtelierStudio() {
       loadArchive();
     } catch (e) {
       setError((e as Error).message);
+      tellVoice(
+        `[ATELIER UPDATE]: The design could not be completed and nothing new is on the showcase board. Do NOT say it is ready. ` +
+          `Speak 1 short sentence apologising and inviting the client to try again.`,
+      );
     } finally {
       setBusy(false);
     }
@@ -743,7 +864,7 @@ export default function AtelierStudio() {
             <span className="atelier-tag">Haute Couture Atelier</span>
           </Link>
         </div>
-        <nav>
+        <nav className="topbar-nav">
           {demoMode !== "off" && <span className="demo-badge">demo mode: {demoMode}</span>}
           {design && (
             <button type="button" className="secondary new-commission-btn" onClick={startOver}>
@@ -782,13 +903,127 @@ export default function AtelierStudio() {
             </button>
           </div>
         </nav>
+
+        {/* Phone topbar: archive + menu sheet instead of the full nav */}
+        <div className="topbar-mobile">
+          <button
+            type="button"
+            className="topbar-icon-btn"
+            onClick={() => {
+              setMenuOpen(false);
+              setArchiveOpen(true);
+              loadArchive();
+            }}
+            aria-label="Open the archive"
+            title="Archive"
+          >
+            <ArchiveIcon size={17} />
+            {pastDesigns.length > 0 && <span className="topbar-icon-count">{pastDesigns.length}</span>}
+          </button>
+          <button
+            type="button"
+            className={`topbar-icon-btn ${menuOpen ? "active" : ""}`}
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-controls="topbar-sheet"
+          >
+            {menuOpen ? <CloseIcon size={16} /> : <MenuIcon size={18} />}
+          </button>
+        </div>
       </header>
+
+      {menuOpen && (
+        <>
+          <div className="topbar-sheet-backdrop" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+          <div className="topbar-sheet" id="topbar-sheet" role="menu">
+            <div className="topbar-sheet-user">
+              <div className="user-avatar-circle">{(user.email?.[0] || "U").toUpperCase()}</div>
+              <div className="topbar-sheet-user-info">
+                <span className="user-profile-name">{user.email?.split("@")[0]}</span>
+                <span className="topbar-sheet-email">{user.email}</span>
+              </div>
+              {userRole && <span className={`auth-user-role ${userRole}`}>{userRole}</span>}
+            </div>
+            {demoMode !== "off" && <span className="demo-badge">demo mode: {demoMode}</span>}
+            {design && (
+              <button
+                type="button"
+                className="sheet-item"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  startOver();
+                }}
+              >
+                <PlusIcon size={15} />
+                <span>New Commission</span>
+              </button>
+            )}
+            <button
+              type="button"
+              className="sheet-item"
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                setArchiveOpen(true);
+                loadArchive();
+              }}
+            >
+              <ArchiveIcon size={15} />
+              <span>Archive{pastDesigns.length > 0 ? ` (${pastDesigns.length})` : ""}</span>
+            </button>
+            <Link href="/factory" className="sheet-item" role="menuitem" onClick={() => setMenuOpen(false)}>
+              <ClipboardIcon size={15} />
+              <span>Factory Portal</span>
+            </Link>
+            <button
+              type="button"
+              className="sheet-item danger"
+              role="menuitem"
+              onClick={() => {
+                setMenuOpen(false);
+                handleSignOut();
+              }}
+            >
+              <LockIcon size={15} />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        </>
+      )}
 
       {error && <ErrorAlert message={error} onClose={() => setError(null)} />}
 
+      {/* Phone pane switcher: the chat and the showcase take turns filling the screen */}
+      <div className="mobile-pane-switch" role="tablist" aria-label="Studio panes">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobilePane === "chat"}
+          className={`mobile-pane-btn ${mobilePane === "chat" ? "active" : ""}`}
+          onClick={() => setMobilePane("chat")}
+        >
+          <ChatIcon size={15} />
+          <span>Couturier</span>
+          {(busy || voiceDesigning) && mobilePane !== "chat" && <span className="mobile-pane-dot busy" aria-hidden="true" />}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobilePane === "showcase"}
+          className={`mobile-pane-btn ${mobilePane === "showcase" ? "active" : ""}`}
+          onClick={() => setMobilePane("showcase")}
+        >
+          <GalleryIcon size={15} />
+          <span>Showcase</span>
+          {design && design.version > 0 && <span className="mobile-pane-version">v{design.version}</span>}
+        </button>
+      </div>
+
       <main className="studio">
         {initialLoading ? (
-          <div className="grid">
+          <div className="grid" data-pane={mobilePane}>
             <section className="panel chat-panel">
               <div className="panel-head">
                 <h2>Couturier Consultation</h2>
@@ -806,7 +1041,7 @@ export default function AtelierStudio() {
             </section>
           </div>
         ) : (
-          <div className="grid">
+          <div className="grid" data-pane={mobilePane}>
         {/* Left Column: Conversational Atelier Stream */}
         <Chat
           messages={messages}
@@ -878,6 +1113,9 @@ export default function AtelierStudio() {
               />
             ) : activeWidget === "measurements" ? (
               <MeasurementCard
+                initialSize={design?.spec.size ?? "M"}
+                gender={design?.spec.gender}
+                garmentType={design?.spec.garment_type}
                 onSubmit={handleApplyMeasurements}
                 onClose={() => setActiveWidget(null)}
                 busy={quoteBusy}
@@ -992,12 +1230,12 @@ export default function AtelierStudio() {
               </div>
             ) : design && design.image_url ? (
               <>
-                {(busy || voiceDesigning) && (
+                {(busy || voiceDesigning || (tryonBusy && !!design.tryon_url)) && (
                   <div className="silk-shimmer-overlay">
                     <span className="spin-silk">
                       <SparkleIcon size={13} />
                     </span>{" "}
-                    Updating Couture Drape…
+                    {tryonBusy ? "Draping on Your Portrait…" : activeTab === "flats" ? "Calibrating Technical Flats…" : "Updating Couture Drape…"}
                   </div>
                 )}
 
@@ -1058,7 +1296,7 @@ export default function AtelierStudio() {
                   </div>
                 ) : activeTab === "flats" ? (
                   design.flats_url ? (
-                    <div>
+                    <div className="flats-view">
                       <img
                         src={design.flats_url}
                         alt="Technical flat sketch"
@@ -1142,7 +1380,17 @@ export default function AtelierStudio() {
                     </div>
                   )
                 ) : activeTab === "tryon" ? (
-                  design.tryon_url ? (
+                  tryonBusy && !design.tryon_url ? (
+                    <div className="silk-shimmer-full" role="status" aria-live="polite">
+                      <div className="shimmer-aura">
+                        <span className="shimmer-icon">
+                          <MirrorIcon size={24} />
+                        </span>
+                      </div>
+                      <h3 className="shimmer-title">Draping You in the Salon Mirror</h3>
+                      <span className="shimmer-subtitle">Fitting the garment to your portrait. This takes a moment…</span>
+                    </div>
+                  ) : design.tryon_url ? (
                     <img
                       src={design.tryon_url}
                       alt="Virtual try-on drape"
@@ -1178,6 +1426,7 @@ export default function AtelierStudio() {
                           type="button"
                           className={design.has_vto_portrait ? "secondary" : "primary"}
                           onClick={() => setActiveWidget("fitting")}
+                          disabled={tryonBusy}
                         >
                           <MirrorIcon size={14} />
                           <span>{design.has_vto_portrait ? "Re-upload Portrait" : "Enter Virtual Fitting Room"}</span>

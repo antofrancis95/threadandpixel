@@ -22,7 +22,15 @@ export const metadata: Metadata = {
   description: "Speak a garment into existence, try it on, and have it made.",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  // Let the on-screen keyboard shrink the layout so the chat composer stays
+  // visible above it instead of being covered.
+  interactiveWidget: "resizes-content",
+  themeColor: "#FAF7F2",
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   const firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG ?? "{}");

@@ -48,11 +48,17 @@ html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
   background-color: var(--bg);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Only the studio shell locks the document; the auth gate, the factory
+   portal and the landing page scroll like ordinary pages. */
+html:has(.atelier-app),
+html:has(.atelier-app) body {
+  overflow: hidden;
 }
 
 /* App Shell */
@@ -93,6 +99,7 @@ html, body {
   font-weight: 500;
   letter-spacing: 0.02em;
   margin: 0;
+  white-space: nowrap;
 }
 
 .brand h1 span {
@@ -152,6 +159,8 @@ button {
   border: none;
   background: transparent;
   outline: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -372,7 +381,9 @@ button.composer-icon-btn.active {
   overflow: hidden;
 }
 
-@media (max-width: 1023px) {
+/* Tablets: the two panels stack and the page scrolls. Phones get their own
+   full-height shell further down (max-width: 767px). */
+@media (min-width: 768px) and (max-width: 1023px) {
   html, body {
     height: auto;
     overflow-y: auto;
@@ -383,10 +394,26 @@ button.composer-icon-btn.active {
     max-height: none;
     overflow: visible;
   }
+  .topbar {
+    padding: 0 1.25rem;
+  }
+  .topbar nav {
+    gap: 0.5rem;
+  }
+  .topbar nav > a,
+  .topbar nav > button,
+  .signout-nav-btn {
+    white-space: nowrap;
+  }
+  .brand .atelier-tag,
+  .user-profile-info,
+  .demo-badge {
+    display: none;
+  }
   .studio {
     height: auto;
     overflow: visible;
-    padding: 1rem 1rem 2rem;
+    padding: 1rem 1.25rem 2rem;
   }
   .grid {
     height: auto;
@@ -1122,6 +1149,35 @@ button.composer-icon-btn.active {
 
 .canvas-frame:hover img {
   transform: scale(1.015);
+}
+
+/* Technical flats: wide FRONT/BACK sheet that must always fit whole inside the frame */
+.canvas-frame .flats-view {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  gap: 0.6rem;
+}
+.canvas-frame .flats-view > img {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: auto;
+  object-fit: contain;
+  background: #fff;
+  box-shadow: none;
+}
+.canvas-frame:hover .flats-view > img {
+  transform: none;
+}
+
+.dropzone-atelier.locked {
+  pointer-events: none;
+  opacity: 0.55;
 }
 
 .canvas-placeholder {
@@ -2756,4 +2812,623 @@ button.composer-icon-btn.active {
 }
 .factory-gate button.primary {
   align-self: flex-start;
+}
+
+/* =========================================================================
+   Factory portal: order detail helpers and the sign-out control
+   ========================================================================= */
+.factory .topbar nav button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0.45rem 0.9rem;
+  font-size: 0.82rem;
+}
+.factory .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+.factory .row button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0.45rem 0.9rem;
+  text-transform: capitalize;
+}
+.factory .row button.primary {
+  background: linear-gradient(180deg, #2D2926 0%, #1A1817 100%);
+  color: #FFFFFF;
+  border-color: var(--ink);
+}
+.factory .gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.6rem;
+  margin: 0.75rem 0 1rem;
+}
+.factory .gallery img,
+.factory .gallery video {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-light);
+  background: var(--ivory);
+  display: block;
+}
+.factory-gate code {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  background: rgba(26, 24, 23, 0.06);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.factory-gate p button {
+  display: inline;
+  padding: 0;
+  color: var(--gold-hover);
+  text-decoration: underline;
+  font-size: inherit;
+}
+
+/* Desktop keeps the text-only Send button; the icon is for phones. */
+.composer-send-icon {
+  display: none;
+}
+
+/* =========================================================================
+   Phone shell (max-width: 767px)
+   The studio becomes a fixed-height app: compact topbar with a menu sheet,
+   a segmented switcher, and the chat and showcase as two full-height panes.
+   ========================================================================= */
+.topbar-mobile,
+.mobile-pane-switch,
+.topbar-sheet,
+.topbar-sheet-backdrop {
+  display: none;
+}
+
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 767px) {
+  html:has(.atelier-app),
+  html:has(.atelier-app) body {
+    height: 100%;
+    overflow: hidden;
+  }
+  /* iOS Safari zooms into any field smaller than 16px on focus. */
+  input, select, textarea {
+    font-size: 16px;
+  }
+  .atelier-app {
+    height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    overflow: hidden;
+  }
+
+  /* ---- Topbar ---- */
+  .topbar {
+    height: auto;
+    min-height: 56px;
+    padding: env(safe-area-inset-top) 0.5rem 0 1rem;
+    gap: 0.5rem;
+  }
+  .brand {
+    min-width: 0;
+  }
+  .brand h1 {
+    font-size: 1.25rem;
+    white-space: nowrap;
+  }
+  .brand .atelier-tag {
+    display: none;
+  }
+  .topbar .topbar-nav {
+    display: none;
+  }
+  .topbar-mobile {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+  }
+  .topbar-icon-btn {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    color: var(--ink);
+    border: 1px solid transparent;
+  }
+  .topbar-icon-btn.active,
+  .topbar-icon-btn:active {
+    background: var(--surface);
+    border-color: var(--line);
+  }
+  .topbar-icon-count {
+    position: absolute;
+    top: 5px;
+    right: 3px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-full);
+    background: var(--gold);
+    color: #FFFFFF;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--bg);
+  }
+
+  /* ---- Menu sheet ---- */
+  .topbar-sheet-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: rgba(26, 24, 23, 0.28);
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.2s ease;
+  }
+  .topbar-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    position: absolute;
+    top: calc(56px + env(safe-area-inset-top));
+    left: 0;
+    right: 0;
+    z-index: 60;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    padding: 0.85rem 1rem 1rem;
+    box-shadow: 0 18px 36px -12px rgba(26, 24, 23, 0.25);
+    animation: fadeSlideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .topbar-sheet-user {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.25rem 0.25rem 0.8rem;
+    border-bottom: 1px solid var(--line-light);
+    margin-bottom: 0.25rem;
+  }
+  .topbar-sheet-user .user-avatar-circle {
+    width: 38px;
+    height: 38px;
+    font-size: 1rem;
+  }
+  .topbar-sheet-user-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+  }
+  .topbar-sheet-user-info .user-profile-name {
+    font-size: 0.92rem;
+  }
+  .topbar-sheet-email {
+    font-size: 0.74rem;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar-sheet .demo-badge {
+    align-self: flex-start;
+    margin: 0.15rem 0 0.25rem;
+  }
+  .sheet-item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.7rem;
+    width: 100%;
+    min-height: 48px;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line-light);
+    background: var(--ivory);
+    color: var(--ink);
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+  }
+  .sheet-item svg {
+    color: var(--gold-dark);
+    flex-shrink: 0;
+  }
+  .sheet-item.danger {
+    color: var(--rose);
+    background: var(--rose-light);
+    border-color: rgba(168, 88, 88, 0.18);
+  }
+  .sheet-item.danger svg {
+    color: var(--rose);
+  }
+
+  .error-banner,
+  .banner.error {
+    margin: 0.5rem 0.75rem 0;
+  }
+
+  /* ---- Pane switcher ---- */
+  .mobile-pane-switch {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.25rem;
+    margin: 0.55rem 0.75rem 0;
+    padding: 0.22rem;
+    border-radius: var(--radius-full);
+    background: linear-gradient(180deg, #F3EDE3 0%, #EAE1D3 100%);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 3px rgba(35, 25, 15, 0.06);
+  }
+  .mobile-pane-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 40px;
+    border-radius: var(--radius-full);
+    border: 1px solid transparent;
+    color: var(--muted);
+    font-size: 0.84rem;
+    font-weight: 500;
+    gap: 0.4rem;
+  }
+  .mobile-pane-btn.active {
+    background: linear-gradient(180deg, #FFFFFF 0%, #FAF8F4 100%);
+    color: var(--ink);
+    font-weight: 600;
+    border-color: rgba(197, 168, 128, 0.35);
+    box-shadow:
+      0 2px 6px -1px rgba(35, 25, 15, 0.1),
+      inset 0 1px 0 #FFFFFF;
+  }
+  .mobile-pane-btn.active svg {
+    color: var(--gold-dark);
+  }
+  .mobile-pane-version {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.12rem 0.4rem;
+    border-radius: var(--radius-full);
+    background: var(--gold-light);
+    color: var(--gold-dark);
+    border: 1px solid rgba(197, 168, 128, 0.4);
+    line-height: 1.2;
+  }
+  .mobile-pane-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 6px var(--gold);
+    animation: voicePulse 1.2s infinite ease-in-out;
+  }
+
+  /* ---- Panes ---- */
+  .studio {
+    padding: 0.55rem 0 0;
+  }
+  .studio .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 0;
+    height: 100%;
+    min-height: 0;
+  }
+  .studio .grid > .panel {
+    grid-area: 1 / 1;
+    min-width: 0;
+    min-height: 0;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    box-shadow: none;
+    padding: 0.7rem 1rem calc(0.7rem + env(safe-area-inset-bottom));
+    gap: 0.65rem;
+    z-index: 1;
+  }
+  /* The hidden pane keeps its layout and scroll position; it just steps back. */
+  .studio .grid[data-pane="chat"] > .showcase-panel,
+  .studio .grid[data-pane="showcase"] > .chat-panel {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ---- Chat pane ---- */
+  .chat-panel .panel-head {
+    padding-bottom: 0.55rem;
+    gap: 0.5rem;
+  }
+  .panel-head h2,
+  .showcase-title {
+    font-size: 1.02rem;
+  }
+  .panel-subtitle {
+    display: none;
+  }
+  .live-voice-btn {
+    padding: 0.42rem 0.8rem;
+    font-size: 0.76rem;
+    white-space: nowrap;
+  }
+  .messages-stream {
+    padding-right: 0;
+    gap: 0.8rem;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .bubble {
+    max-width: 92%;
+    font-size: 0.9rem;
+    padding: 0.75rem 0.95rem;
+  }
+  .inline-widget {
+    max-width: 100%;
+    padding: 0.9rem;
+  }
+  .composer-atelier {
+    gap: 0.4rem;
+    padding-top: 0.6rem;
+  }
+  button.mic,
+  button.composer-icon-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+  .composer-atelier input {
+    height: 42px;
+    min-width: 0;
+    padding: 0 0.9rem;
+  }
+  .composer-atelier button.primary {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    padding: 0;
+    border-radius: 50%;
+  }
+  .composer-send-icon {
+    display: inline-block;
+  }
+  .composer-send-label {
+    display: none;
+  }
+  .voice-spectrum-hint {
+    display: none;
+  }
+  .voice-spectrum-bar {
+    padding: 0.35rem 0.7rem;
+  }
+
+  /* ---- Showcase pane: the panel scrolls; the canvas takes its natural height ---- */
+  .showcase-panel {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .showcase-panel .panel-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+    padding-bottom: 0.6rem;
+  }
+  .showcase-title {
+    white-space: normal;
+    flex-wrap: wrap;
+    row-gap: 0.3rem;
+  }
+  .view-tabs {
+    display: flex;
+    width: 100%;
+  }
+  .view-tab {
+    flex: 1 1 0;
+    min-height: 38px;
+    padding: 0.35rem 0.4rem;
+    font-size: 0.76rem;
+  }
+  .view-tab .tab-pill {
+    display: none;
+  }
+  .canvas-frame {
+    flex: 0 0 auto;
+    min-height: 300px;
+  }
+  .canvas-frame img,
+  .canvas-frame video {
+    width: 100%;
+    max-height: none;
+  }
+  .canvas-frame > div {
+    width: 100%;
+  }
+  .canvas-frame .flats-view {
+    height: auto;
+  }
+  .canvas-frame .flats-view > img {
+    flex: 0 0 auto;
+    height: auto;
+  }
+  .canvas-frame:hover img {
+    transform: none;
+  }
+  .silk-shimmer-full,
+  .canvas-skeleton-box {
+    min-height: 300px;
+  }
+  .asset-empty-state {
+    padding: 1.5rem 0.5rem;
+    max-width: 100%;
+  }
+  .spec-ribbon {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -1rem;
+    padding: 0.4rem 1rem;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .spec-ribbon::-webkit-scrollbar {
+    display: none;
+  }
+  .spec-chip {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .showcase-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+  .showcase-action-btn {
+    min-width: 0;
+    min-height: 44px;
+    padding: 0.55rem 0.6rem;
+    font-size: 0.78rem;
+  }
+  .showcase-actions > .showcase-action-btn:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  .actions-skeleton-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* ---- Archive drawer becomes a full-width sheet ---- */
+  .drawer-panel {
+    max-width: none;
+    padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  /* ---- Factory portal ---- */
+  .factory .topbar {
+    min-height: 56px;
+    height: auto;
+    padding: 0 1rem;
+  }
+  .factory .topbar h1 {
+    font-size: 1.15rem;
+  }
+  .factory .topbar .atelier-tag {
+    display: none;
+  }
+  .factory .topbar nav {
+    gap: 0.3rem;
+  }
+  .factory .panel {
+    padding: 1rem;
+  }
+  .factory-grid {
+    gap: 1rem;
+  }
+  .factory-gate {
+    padding: 1.5rem 1.15rem;
+  }
+  .factory-gate h2 {
+    font-size: 1.6rem;
+  }
+  /* The orders table collapses into a stack of order cards. */
+  .orders thead {
+    display: none;
+  }
+  .orders,
+  .orders tbody {
+    display: block;
+    width: 100%;
+  }
+  .orders tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem 0.6rem;
+    padding: 0.7rem 0.75rem;
+    border: 1px solid var(--line-light);
+    border-radius: var(--radius-md);
+    margin-bottom: 0.5rem;
+    background: var(--surface);
+  }
+  .orders tbody tr.active {
+    border-color: var(--gold);
+    background: var(--gold-light);
+  }
+  .orders tbody td {
+    display: block;
+    border: 0;
+    padding: 0;
+  }
+  .orders td.col-id {
+    order: 1;
+    flex: 1 1 auto;
+    font-weight: 600;
+  }
+  .orders td.col-status {
+    order: 2;
+  }
+  .orders td.col-garment {
+    order: 3;
+    flex: 1 1 100%;
+    color: var(--ink-secondary);
+  }
+  .orders td.col-size {
+    order: 4;
+  }
+  .orders td.col-total {
+    order: 5;
+  }
+  .orders td.col-empty {
+    flex: 1 1 100%;
+    text-align: center;
+    padding: 0.5rem 0;
+  }
+  .orders td[data-label]::before {
+    content: attr(data-label) " ";
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 600;
+    margin-right: 0.15rem;
+  }
+}
+
+/* Touch devices: hover lifts make no sense under a finger. */
+@media (hover: none) {
+  button.primary:hover:not(:disabled),
+  button.secondary:hover:not(:disabled),
+  button.mic:hover:not(:disabled),
+  button.composer-icon-btn:hover:not(:disabled),
+  .chip-btn:hover,
+  .showcase-action-btn:hover:not(:disabled),
+  .archive-trigger-btn:hover,
+  .live-voice-btn:hover,
+  .google-signin-btn:hover,
+  .auth-submit-btn:hover,
+  .archive-item-card:hover {
+    transform: none;
+  }
 }

@@ -246,9 +246,10 @@ def _run_tool(
     fit: str | None = None,
 ) -> dict:
     msg = MessageIn(text=request[:2000], gender=gender, size=size, fit=fit)
+    # The voice agent only calls update_design after consultation, so the Tailor must sketch, not re-consult.
     if state.get("design_id"):
-        return continue_design(user, state["design_id"], msg)
-    return create_design(user, msg)
+        return continue_design(user, state["design_id"], msg, force_sketch=True)
+    return create_design(user, msg, force_sketch=True)
 
 
 @router.websocket("/live")
@@ -276,7 +277,8 @@ async def live_session(ws: WebSocket):
         await ws.close(code=1008)
         return
 
-    state = {"design_id": start.get("design_id") or None}
+    # version is unknown (None) when resuming an existing design, so the "new sketch produced" check is skipped there.
+    state = {"design_id": start.get("design_id") or None, "version": None if start.get("design_id") else 0}
     tool_running = False
 
     async def send(payload: dict) -> None:
@@ -402,6 +404,8 @@ async def live_session(ws: WebSocket):
                             return
 
                         # Background design generation while Couturier voice confirms to client
+                        prev_version = state.get("version")
+
                         async def _run_design_bg():
                             try:
                                 design = await asyncio.to_thread(_run_tool, user, state, request, gender, size, fit)
@@ -419,6 +423,22 @@ async def live_session(ws: WebSocket):
 
                                 state["design_id"] = design["design_id"]
                                 await send({"type": "design", "design": design})
+
+                                # Never announce a drape that was not produced (e.g. the Tailor still wanted details).
+                                if not design.get("image_url") or (prev_version is not None and design.get("version", 0) <= prev_version):
+                                    log.warning("live: update_design produced no new sketch (design %s)", design["design_id"])
+                                    await send({"type": "error", "message": "The sketch could not be completed. Please try again."})
+                                    notice = (
+                                        "[ATELIER UPDATE]: The sketch was NOT completed and nothing new is on the showcase board. "
+                                        "Do NOT say it is ready. Speak 1 short, warm sentence apologising and asking the client to confirm "
+                                        "or restate their preferred color, fit and fabric so you can try sketching again."
+                                    )
+                                    try:
+                                        await session.send_realtime_input(text=notice)
+                                    except Exception as exc:
+                                        log.warning("live: notice send failed: %s", exc)
+                                    return
+                                state["version"] = design["version"]
                                 if design.get("flats_url"):
                                     await send({"type": "flats", "flats_url": design["flats_url"]})
 
@@ -435,6 +455,14 @@ async def live_session(ws: WebSocket):
                             except Exception as exc:
                                 log.exception("live: async design generation failed")
                                 await send({"type": "error", "message": f"Design generation failed: {exc}"})
+                                notice = (
+                                    "[ATELIER UPDATE]: The sketch FAILED and nothing is on the showcase board. Do NOT say it is ready. "
+                                    "Speak 1 short, warm sentence apologising and offering to try again."
+                                )
+                                try:
+                                    await session.send_realtime_input(text=notice)
+                                except Exception as exc2:
+                                    log.warning("live: notice send failed: %s", exc2)
 
                         asyncio.create_task(_run_design_bg())
 

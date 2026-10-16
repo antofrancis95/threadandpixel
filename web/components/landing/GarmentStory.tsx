@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { LandingImage } from "@/lib/landingMedia";
 import { GarmentFlat, GarmentOnModel, VoiceToSilhouette } from "./GarmentArt";
+import { Picture } from "./Picture";
 import { Reveal } from "./Reveal";
 
 /**
@@ -11,9 +13,12 @@ import { Reveal } from "./Reveal";
  */
 
 export type StoryMedia = {
-  flats?: string | null;
-  tryon?: string | null;
+  flats?: LandingImage | null;
+  tryon?: LandingImage | null;
 };
+
+/** The step frame is at most half the content width on desktop, full width on phones. */
+const FRAME_SIZES = "(min-width: 1024px) 40vw, 90vw";
 
 const STEPS = [
   {
@@ -118,12 +123,22 @@ export function GarmentStory({ media = {} }: { media?: StoryMedia }) {
   const visuals: ReactNode[] = [
     <VoiceToSilhouette key="speak" />,
     media.flats ? (
-      <img key="flats" src={media.flats} alt="Technical flats of the dress, front and back, with size M measurements" />
+      <Picture
+        key="flats"
+        image={media.flats}
+        sizes={FRAME_SIZES}
+        alt="Technical flats of the dress, front and back, with size M measurements"
+      />
     ) : (
       <GarmentFlat key="flats" />
     ),
     media.tryon ? (
-      <img key="tryon" src={media.tryon} alt="The dress draped onto a model in the virtual fitting room" />
+      <Picture
+        key="tryon"
+        image={media.tryon}
+        sizes={FRAME_SIZES}
+        alt="The dress draped onto a model in the virtual fitting room"
+      />
     ) : (
       <GarmentOnModel key="tryon" />
     ),

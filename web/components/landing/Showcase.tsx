@@ -1,6 +1,8 @@
 import { ClipboardIcon, FilmIcon, HourglassIcon, MicIcon, MirrorIcon, RecycleIcon, RulerIcon, ScissorsIcon, SparkleIcon } from "@/components/icons";
 import { GarmentFlat, GarmentOnModel, GarmentRender } from "./GarmentArt";
 import { WordmarkText } from "./LandingNav";
+import { LazyVideo } from "./LazyVideo";
+import { Picture } from "./Picture";
 import { Reveal } from "./Reveal";
 import type { LandingMedia } from "@/lib/landingMedia";
 
@@ -34,6 +36,13 @@ function Tabs({ active }: { active: "editorial" | "flats" | "tryon" | "runway" }
       </span>
     </div>
   );
+}
+
+/** Largest WebP rendition of the still (the panel is ~500px wide), else the JPEG. */
+function posterFor(still: LandingMedia["runwayStill"]): string | undefined {
+  if (!still) return undefined;
+  const last = still.webpSrcSet?.split(",").pop()?.trim().split(" ")[0];
+  return last || still.src;
 }
 
 export function Showcase({ media }: { media: LandingMedia }) {
@@ -152,7 +161,12 @@ export function Showcase({ media }: { media: LandingMedia }) {
                 <Tabs active="flats" />
                 <div className="lp-canvas">
                   {media.flats ? (
-                    <img className="contain" src={media.flats} alt="Technical flats of the dress, front and back, annotated with size M measurements" />
+                    <Picture
+                      className="contain"
+                      image={media.flats}
+                      sizes="(min-width: 1024px) 48vw, 90vw"
+                      alt="Technical flats of the dress, front and back, annotated with size M measurements"
+                    />
                   ) : (
                     <GarmentFlat />
                   )}
@@ -213,7 +227,11 @@ export function Showcase({ media }: { media: LandingMedia }) {
                 <div className="lp-frame-body">
                   <div className={`lp-canvas portrait ${media.tryon ? "" : "lp-placeholder"}`}>
                     {media.tryon ? (
-                      <img src={media.tryon} alt="Virtual try-on: the navy silk dress draped onto a model" />
+                      <Picture
+                        image={media.tryon}
+                        sizes="(min-width: 1024px) 24vw, (min-width: 768px) 45vw, 90vw"
+                        alt="Virtual try-on: the navy silk dress draped onto a model"
+                      />
                     ) : (
                       <>
                         {/* PLACEHOLDER until api/scripts/landing_assets.py has produced web/public/landing/tryon.jpg */}
@@ -237,15 +255,12 @@ export function Showcase({ media }: { media: LandingMedia }) {
                 <div className="lp-frame-body">
                   <div className={`lp-canvas portrait ${media.runway ? "" : "lp-placeholder"}`}>
                     {media.runway ? (
-                      <video
-                        src={media.runway}
-                        poster={media.runwayStill ?? undefined}
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        controls
-                        aria-label="Eight-second runway clip of the dress"
+                      <LazyVideo
+                        src={media.runway.src}
+                        width={media.runway.width}
+                        height={media.runway.height}
+                        poster={posterFor(media.runwayStill)}
+                        label="Eight-second runway clip of the dress"
                       />
                     ) : (
                       <>

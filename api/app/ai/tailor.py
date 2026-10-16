@@ -196,6 +196,7 @@ def converse(
     current: DesignSpec | None,
     has_vto: bool = False,
     explicit_gender: str | None = None,
+    force_sketch: bool = False,
 ) -> TailorTurn:
     # 1. ADK Input Guardrail: Trademark and brand shield
     sanitized_text, brand_notice = sanitize_input_text(msg.text or "")
@@ -235,7 +236,18 @@ def converse(
         "suggested_action='none', do NOT answer or advise on the off-topic topic, and warmly guide the client back "
         "to their bespoke atelier design in their spoken language."
     )
-    directives = " ".join(d for d in [vto_status, gender_directive, occasion_directive, design_image_directive, offtopic_guard_note] if d)
+    force_sketch_directive = (
+        "CONSULTATION IS COMPLETE: the live voice Couturier already gathered the client's bespoke details and commissioned the sketch. "
+        "Fill any detail not stated (color, fit, fabric) with your best bespoke choice, set ready_to_sketch=true, and write a full image_prompt. "
+        "Do NOT ask further consultation questions."
+        if force_sketch
+        else ""
+    )
+    directives = " ".join(
+        d
+        for d in [vto_status, gender_directive, occasion_directive, design_image_directive, force_sketch_directive, offtopic_guard_note]
+        if d
+    )
     context = (
         f"Current design spec: {current.model_dump_json()}. {directives}"
         if current
@@ -268,6 +280,9 @@ def converse(
 
     if turn.is_off_topic and current:
         turn.spec = current
+
+    if force_sketch and not turn.is_off_topic:
+        turn.ready_to_sketch = True
 
     # 2. ADK Output Guardrail: Brand notification, fabric whitelist, off-topic deflection & next-action assignment
     turn = apply_output_guardrail(turn, brand_notice=brand_notice, has_vto=has_vto, current_spec=current)

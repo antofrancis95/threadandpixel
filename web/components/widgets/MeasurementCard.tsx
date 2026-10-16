@@ -2,25 +2,31 @@
 
 import { useState } from "react";
 import { CloseIcon, ScissorsIcon } from "@/components/icons";
-import { SIZES, type Measurements } from "@/lib/types";
+import { SIZES, bodyPreset, type Measurements, type Size } from "@/lib/types";
 
 export function MeasurementCard({
   initialSize = "M",
-  initialMeasurements = {},
+  initialMeasurements,
+  gender,
+  garmentType,
   onSubmit,
   onClose,
   busy = false,
 }: {
-  initialSize?: string;
+  initialSize?: Size;
   initialMeasurements?: Measurements;
+  gender?: string | null;
+  garmentType?: string | null;
   onSubmit: (size: string, measurements?: Measurements) => void;
   onClose?: () => void;
   busy?: boolean;
 }) {
-  const [size, setSize] = useState<string>(initialSize);
+  const [size, setSize] = useState<Size>(initialSize);
   const [unit, setUnit] = useState<"cm" | "in">("cm");
   const [customMode, setCustomMode] = useState<boolean>(false);
-  const [measurements, setMeasurements] = useState<Measurements>(initialMeasurements);
+  const [measurements, setMeasurements] = useState<Measurements>(
+    () => initialMeasurements ?? bodyPreset(initialSize, gender, garmentType),
+  );
 
   const factor = unit === "in" ? 2.54 : 1;
 
@@ -37,6 +43,12 @@ export function MeasurementCard({
     const val = measurements[key];
     if (val === undefined) return "";
     return unit === "in" ? (val / 2.54).toFixed(1) : String(val);
+  }
+
+  // Each standard size carries its own tape, so switching size reloads the fields with that size's measurements.
+  function chooseSize(s: Size) {
+    setSize(s);
+    setMeasurements(bodyPreset(s, gender, garmentType));
   }
 
   function handleConfirm() {
@@ -69,7 +81,7 @@ export function MeasurementCard({
             key={s}
             type="button"
             className={`size-pill ${size === s ? "active" : ""}`}
-            onClick={() => setSize(s)}
+            onClick={() => chooseSize(s)}
           >
             {s}
           </button>
@@ -160,7 +172,7 @@ export function MeasurementCard({
 
       <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
         <button type="button" className="primary" onClick={handleConfirm} disabled={busy}>
-          {busy ? "Tailoring tech pack…" : `Apply Fit & Size ${size}`}
+          {busy ? "Calibrating flats & tech pack…" : `Apply Fit & Size ${size}`}
         </button>
       </div>
     </div>

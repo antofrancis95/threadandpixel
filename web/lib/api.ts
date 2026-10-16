@@ -58,9 +58,10 @@ export function createApi(baseUrl: string, auth: Auth) {
     listDesigns: () => request<DesignSummary[]>("/designs"),
     getDesign: (id: string) => request<Design>(`/designs/${encodeURIComponent(id)}`),
     sendMessage: (id: string, msg: MessageInput) => post<Design>(`/designs/${encodeURIComponent(id)}/messages`, msg),
-    createFlats: (id: string, size?: Size | string) =>
+    createFlats: (id: string, size?: Size | string, measurements?: Measurements) =>
       post<{ flats_url: string; size?: Size }>(
         `/designs/${encodeURIComponent(id)}/flats${size ? `?size=${encodeURIComponent(size)}` : ""}`,
+        measurements ? { measurements } : undefined,
       ),
     uploadPerson: (file: File) => {
       const form = new FormData();

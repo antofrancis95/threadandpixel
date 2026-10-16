@@ -97,4 +97,34 @@ export type OrderDetail = {
 
 export const SIZES = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 export type Size = (typeof SIZES)[number];
+
+type BodyPreset = Required<Measurements>;
+
+// Body measurements (cm) behind each standard size; they pre-fill the custom tape and are what the flats are scaled from.
+// Keep in sync with BODY_PRESETS in api/app/ai/designer.py.
+export const BODY_PRESETS: Record<"menswear" | "womenswear", Record<Size, BodyPreset>> = {
+  menswear: {
+    XS: { bust_cm: 86, waist_cm: 72, hip_cm: 90, height_cm: 168 },
+    S: { bust_cm: 92, waist_cm: 78, hip_cm: 95, height_cm: 172 },
+    M: { bust_cm: 98, waist_cm: 84, hip_cm: 100, height_cm: 176 },
+    L: { bust_cm: 104, waist_cm: 90, hip_cm: 105, height_cm: 180 },
+    XL: { bust_cm: 110, waist_cm: 96, hip_cm: 110, height_cm: 183 },
+    XXL: { bust_cm: 116, waist_cm: 102, hip_cm: 115, height_cm: 186 },
+  },
+  womenswear: {
+    XS: { bust_cm: 80, waist_cm: 62, hip_cm: 86, height_cm: 160 },
+    S: { bust_cm: 84, waist_cm: 66, hip_cm: 90, height_cm: 164 },
+    M: { bust_cm: 88, waist_cm: 70, hip_cm: 96, height_cm: 168 },
+    L: { bust_cm: 94, waist_cm: 76, hip_cm: 102, height_cm: 172 },
+    XL: { bust_cm: 100, waist_cm: 82, hip_cm: 108, height_cm: 175 },
+    XXL: { bust_cm: 106, waist_cm: 88, hip_cm: 114, height_cm: 178 },
+  },
+};
+
+export function bodyPreset(size: Size, gender?: string | null, garmentType?: string | null): BodyPreset {
+  const womenswear =
+    gender === "womenswear" ||
+    (gender !== "menswear" && ["dress", "skirt", "jumpsuit"].includes(garmentType ?? ""));
+  return BODY_PRESETS[womenswear ? "womenswear" : "menswear"][size];
+}
 export const ORDER_STATUSES = ["new", "cutting", "sewing", "shipped"] as const;

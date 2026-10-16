@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { GarmentFlat, GarmentSketch } from "./GarmentArt";
 import { WordmarkText } from "./LandingNav";
+import { Picture } from "./Picture";
 import { Reveal } from "./Reveal";
+import type { LandingImage } from "@/lib/landingMedia";
 
 function Arrow() {
   return (
@@ -11,7 +13,7 @@ function Arrow() {
   );
 }
 
-export function Portals({ render }: { render?: string | null }) {
+export function Portals({ render }: { render?: LandingImage | null }) {
   return (
     <section className="lp-section" id="portals" aria-labelledby="portals-title">
       <div className="lp-wrap">
@@ -58,7 +60,7 @@ export function Portals({ render }: { render?: string | null }) {
                   <div className="lp-archive" style={{ marginTop: "0.75rem" }}>
                     <div className="lp-archive-item is-active">
                       <span className="lp-archive-thumb">
-                        {render ? <img src={render} alt="" /> : <GarmentSketch />}
+                        {render ? <Picture image={render} sizes="44px" alt="" /> : <GarmentSketch />}
                       </span>
                       <span>
                         <b>Midi dress, silk charmeuse</b>

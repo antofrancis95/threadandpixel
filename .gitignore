@@ -20,3 +20,5 @@ out/
 # Local generated assets
 tmp/
 *.log
+.next-build/
+.DS_Store

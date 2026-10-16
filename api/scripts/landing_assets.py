@@ -6,12 +6,17 @@ Produces, in web/public/landing/:
   person.png        generated adult model photo used as the try-on subject (image model)
   tryon.jpg         Vertex Virtual Try-On result
   runway-still.png  studio still derived from the try-on (image model)
-  runway.mp4        8-second Veo clip from the still
+  runway.mp4        8-second Veo clip from the still, re-encoded for the web when ffmpeg is present
+  *-480.webp, *-800.webp and manifest.json
+                    responsive renditions and intrinsic sizes read by web/lib/landingMedia.ts
 
 Usage: PYTHONPATH=. .venv/bin/python scripts/landing_assets.py
 Existing files are reused, so a re-run only fills what is missing.
 """
 
+import json
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -93,6 +98,56 @@ def produce(stem: str, fn) -> tuple[bytes, str]:
     return data, mime
 
 
+def derive() -> None:
+    """Responsive WebP renditions, a manifest with intrinsic sizes, and a web-sized clip."""
+    from PIL import Image
+
+    manifest: dict = {}
+    for stem in ("render", "flats", "tryon", "runway-still"):
+        src = existing(stem)
+        if not src:
+            continue
+        image = Image.open(src)
+        width, height = image.size
+        variants = []
+        for target in (480, 800):
+            if target >= width:
+                continue  # never upscale
+            out = OUT / f"{stem}-{target}.webp"
+            if not out.exists():
+                small = image.copy()
+                small.thumbnail((target, 10_000), Image.LANCZOS)
+                small.save(out, "WEBP", quality=80, method=6)
+            variants.append({"src": f"/landing/{out.name}", "width": Image.open(out).size[0]})
+        manifest[stem] = {"src": f"/landing/{src.name}", "width": width, "height": height, "webp": variants}
+        log(f"{stem}: {len(variants)} webp rendition(s)")
+
+    video = OUT / "runway.mp4"
+    if video.exists():
+        previous = {}
+        if (OUT / "manifest.json").exists():
+            try:
+                previous = json.loads((OUT / "manifest.json").read_text()).get("runway", {})
+            except ValueError:
+                previous = {}
+        optimised = bool(previous.get("optimised"))
+        if shutil.which("ffmpeg") and not optimised:
+            tmp = OUT / "runway-opt.mp4"
+            subprocess.run(
+                ["ffmpeg", "-v", "error", "-y", "-i", str(video), "-an", "-movflags", "+faststart",
+                 "-c:v", "libx264", "-preset", "slow", "-crf", "27", "-pix_fmt", "yuv420p", "-vf", "scale=720:-2", str(tmp)],
+                check=True,
+            )
+            before, after = video.stat().st_size, tmp.stat().st_size
+            tmp.replace(video)
+            optimised = True
+            log(f"runway: re-encoded {before // 1024} KB -> {after // 1024} KB")
+        manifest["runway"] = {"src": "/landing/runway.mp4", "width": 720, "height": 1280, "optimised": optimised}
+
+    (OUT / "manifest.json").write_text(json.dumps(manifest, indent=1))
+    log("manifest.json written")
+
+
 def main() -> None:
     render, render_mime = produce("render", lambda: designer.generate(RENDER_PROMPT))
     produce("flats", lambda: designer.technical_flats(render, render_mime, SPEC, "M"))
@@ -109,6 +164,7 @@ def main() -> None:
     video_path = OUT / "runway.mp4"
     if video_path.exists() and video_path.stat().st_size > 0:
         log("runway: reusing runway.mp4")
+        derive()
         return
     log("runway: starting Veo job…")
     op = runway.start(still, still_mime, f"landing/runway-{int(time.time())}/")
@@ -125,6 +181,7 @@ def main() -> None:
     data = storage.download(path)[0]
     video_path.write_bytes(data)
     log(f"runway: saved runway.mp4 ({len(data) // 1024} KB) in {time.time() - started:.0f}s")
+    derive()
 
 
 if __name__ == "__main__":

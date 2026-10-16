@@ -92,10 +92,11 @@ export function FittingRoomCard({
           : "Upload a full-length, front-facing portrait to drape this garment directly onto yourself:"}
       </p>
 
-      <div className="dropzone-atelier">
+      <div className={`dropzone-atelier ${busy ? "locked" : ""}`} aria-disabled={busy}>
         <input
           type="file"
           accept="image/jpeg,image/png,image/webp"
+          disabled={busy}
           onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
         />
         {previewUrl ? (
@@ -107,7 +108,9 @@ export function FittingRoomCard({
             />
             <div style={{ textAlign: "left" }}>
               <strong style={{ fontSize: "0.85rem", display: "block" }}>{file?.name}</strong>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Tap to replace photo</span>
+              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+                {busy ? "Draping in progress…" : "Tap to replace photo"}
+              </span>
             </div>
           </div>
         ) : (
@@ -127,8 +130,8 @@ export function FittingRoomCard({
 
       <div
         className="consent-row"
-        onClick={() => setConsent(!consent)}
-        style={{ cursor: "pointer", userSelect: "none" }}
+        onClick={() => !busy && setConsent(!consent)}
+        style={{ cursor: busy ? "default" : "pointer", userSelect: "none" }}
       >
         <span
           className={`atelier-checkbox ${consent ? "checked" : ""}`}

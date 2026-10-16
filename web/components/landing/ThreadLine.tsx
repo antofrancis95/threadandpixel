@@ -24,8 +24,10 @@ export function ThreadLine() {
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     let total = 0;
-    let samples: { len: number; y: number }[] = [];
+    // Monotonic in y (anchors are sorted), so a binary search finds the stitch point.
+    let samples: { len: number; x: number; y: number }[] = [];
     let raf = 0;
+    let buildRaf = 0;
 
     function build() {
       if (!svg || !path || !ghost || !root) return;
@@ -69,7 +71,8 @@ export function ThreadLine() {
       samples = [];
       for (let i = 0; i <= n; i++) {
         const len = (total * i) / n;
-        samples.push({ len, y: path.getPointAtLength(len).y });
+        const pt = path.getPointAtLength(len);
+        samples.push({ len, x: pt.x, y: pt.y });
       }
       update();
     }
@@ -82,18 +85,19 @@ export function ThreadLine() {
         return;
       }
       const target = window.scrollY + window.innerHeight * 0.62;
-      let len = total;
-      for (let i = 0; i < samples.length; i++) {
-        if (samples[i].y >= target) {
-          len = samples[i].len;
-          break;
-        }
+      let lo = 0;
+      let hi = samples.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (samples[mid].y >= target) hi = mid;
+        else lo = mid + 1;
       }
+      const hit = samples.length && samples[lo].y >= target ? samples[lo] : null;
+      const len = hit ? hit.len : total;
       path.style.strokeDashoffset = `${Math.max(0, total - len)}`;
-      if (len > 0 && len < total) {
-        const p = path.getPointAtLength(len);
-        needle.setAttribute("cx", p.x.toFixed(1));
-        needle.setAttribute("cy", p.y.toFixed(1));
+      if (hit && len > 0 && len < total) {
+        needle.setAttribute("cx", hit.x.toFixed(1));
+        needle.setAttribute("cy", hit.y.toFixed(1));
         needle.style.display = "";
       } else {
         needle.style.display = "none";
@@ -108,20 +112,29 @@ export function ThreadLine() {
       });
     }
 
-    const ro = new ResizeObserver(() => build());
+    // Layout changes (fonts settling, media loading) arrive in bursts; rebuild once per frame.
+    function scheduleBuild() {
+      if (buildRaf) return;
+      buildRaf = requestAnimationFrame(() => {
+        buildRaf = 0;
+        build();
+      });
+    }
+
+    const ro = new ResizeObserver(scheduleBuild);
     ro.observe(root);
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", build);
+    window.addEventListener("resize", scheduleBuild);
     build();
-    // Fonts shift layout; rebuild once they settle.
-    if (document.fonts?.ready) document.fonts.ready.then(build).catch(() => {});
-    const t = setTimeout(build, 600);
+    if (document.fonts?.ready) document.fonts.ready.then(scheduleBuild).catch(() => {});
+    const t = setTimeout(scheduleBuild, 600);
 
     return () => {
       ro.disconnect();
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", build);
+      window.removeEventListener("resize", scheduleBuild);
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(buildRaf);
       clearTimeout(t);
     };
   }, []);
