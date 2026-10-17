@@ -151,6 +151,27 @@ export function MicIcon({ size = 16, className, ...props }: IconProps) {
   );
 }
 
+export function MicOffIcon({ size = 16, className, ...props }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <path d="M9 9v2a3 3 0 0 0 5.1 2.1M15 9.5V5a3 3 0 0 0-6 0v.5" />
+      <path d="M5 10a7 7 0 0 0 10.6 6M19 10a7 7 0 0 1-1.1 3.8M12 17v4M8 21h8" />
+      <path d="M3 3l18 18" />
+    </svg>
+  );
+}
+
 export function StopIcon({ size = 14, className, ...props }: IconProps) {
   return (
     <svg

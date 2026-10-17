@@ -99,7 +99,7 @@ export function CommissionCard({
         </p>
       )}
 
-      <details style={{ fontSize: "0.82rem", margin: "0.6rem 0", color: "var(--ink-secondary)" }}>
+      <details style={{ fontSize: "var(--text-sm)", margin: "0.6rem 0", color: "var(--ink-secondary)" }}>
         <summary style={{ cursor: "pointer", fontWeight: 500, color: "var(--muted)" }}>
           View construction notes &amp; seam specifications ({data.techpack.construction_notes.length} steps)
         </summary>

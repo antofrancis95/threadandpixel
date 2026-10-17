@@ -70,7 +70,7 @@ export function MeasurementCard({
         )}
       </div>
 
-      <p style={{ fontSize: "0.82rem", color: "var(--muted)", margin: "0 0 0.75rem" }}>
+      <p className="inline-widget-lede">
         Select standard couture sizing or enter your bespoke measurements for pattern-making:
       </p>
 
@@ -97,7 +97,7 @@ export function MeasurementCard({
             background: "none",
             border: "none",
             color: "var(--gold-dark)",
-            fontSize: "0.82rem",
+            fontSize: "var(--text-sm)",
             padding: 0,
             textDecoration: "underline",
             cursor: "pointer",
@@ -107,7 +107,7 @@ export function MeasurementCard({
         </button>
 
         {customMode && (
-          <div style={{ display: "flex", gap: "0.3rem", fontSize: "0.75rem" }}>
+          <div style={{ display: "flex", gap: "0.3rem", fontSize: "var(--text-xs)" }}>
             <button
               type="button"
               className={`size-pill ${unit === "cm" ? "active" : ""}`}

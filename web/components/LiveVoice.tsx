@@ -1,8 +1,8 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useApp } from "@/lib/providers";
-import type { AtelierAction, Design } from "@/lib/types";
+import type { AtelierAction, Design, QuoteResponse } from "@/lib/types";
 
 // Captures mic audio as 16 kHz mono PCM16 in ~100 ms chunks.
 const CAPTURE_WORKLET = `
@@ -32,7 +32,97 @@ class PcmCapture extends AudioWorkletProcessor {
 registerProcessor("pcm-capture", PcmCapture);
 `;
 
-type Status = "idle" | "connecting" | "listening" | "designing" | "error";
+/**
+ * Voice session state machine.
+ *
+ *   idle ─▶ connecting ─▶ listening ◀─▶ thinking ◀─▶ speaking
+ *                             │
+ *                             ├─▶ dropped   (the server closed the line)
+ *                             └─▶ error     (mic refused, auth, or the socket failed)
+ *
+ * A running tool (sketching, drafting flats…) is tracked beside the phase, because
+ * the Couturier keeps talking while the atelier works in the background.
+ *
+ * The WebSocket protocol with api/app/live.py is unchanged.
+ */
+export type VoicePhase = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "dropped" | "error";
+
+export type VoiceTool =
+  | "update_design"
+  | "draft_flats"
+  | "open_fitting"
+  | "generate_runway"
+  | "get_quote"
+  | "open_design_upload"
+  | "open_occasion_stylist";
+
+export type VoiceErrorKind = "mic" | "auth" | "connection";
+
+export type VoiceCaptions = {
+  /** What the client said in the current turn (streamed in). */
+  user: string;
+  /** What the Couturier is saying in reply (streamed in). */
+  model: string;
+  /** The client spoke over the Couturier; the model text above was cut short. */
+  modelInterrupted: boolean;
+};
+
+export type VoiceLevels = { mic: number; out: number };
+
+export type MicPermission = "unknown" | "prompt" | "granted" | "denied";
+
+/** Hands-free lets the model decide when you have finished; hold-to-talk lets you. */
+export type VoiceMode = "vad" | "ptt";
+
+export type VoiceState = {
+  phase: VoicePhase;
+  tool: VoiceTool | null;
+  muted: boolean;
+  /** A non-fatal problem reported by the server; the session continues. */
+  notice: string | null;
+  /** Why the session ended (phase "error"). */
+  error: { kind: VoiceErrorKind; message: string } | null;
+  captions: VoiceCaptions;
+  /** The Couturier's last finished sentence; announced to assistive tech. */
+  lastModelTurn: string;
+  micPermission: MicPermission;
+  mode: VoiceMode;
+  /** Push-to-talk: the mic is held down right now. */
+  holding: boolean;
+};
+
+export type VoiceController = VoiceState & {
+  /** True from connecting through to a live conversation. */
+  active: boolean;
+  /** Mic and playback loudness (0..1), updated per animation frame for the visuals. */
+  levels: MutableRefObject<VoiceLevels>;
+  start: () => void;
+  stop: () => void;
+  toggleMute: () => void;
+  sendMessage: (text: string) => void;
+  setDesignId: (id: string) => void;
+  dismissNotice: () => void;
+  /** Only while idle; the mode is fixed for the length of a call. */
+  setMode: (mode: VoiceMode) => void;
+  holdStart: () => void;
+  holdEnd: () => void;
+};
+
+export interface LiveVoiceOptions {
+  designId: string | null;
+  onTranscript: (role: "user" | "model", text: string) => void;
+  onTurnComplete: () => void;
+  onInterrupted?: () => void;
+  onDesign: (design: Design) => void;
+  onFlats?: (flatsUrl: string) => void;
+  onWidget?: (widget: AtelierAction, occasion?: string, gender?: string) => void;
+  onRunwayStarted?: (job: unknown) => void;
+  onQuote?: (quote: QuoteResponse) => void;
+  /** Recent conversation, sent on connect so a re-established line resumes instead of starting cold. */
+  getHistory?: () => { role: "user" | "model"; text: string }[];
+  onToolStart?: (tool: VoiceTool) => void;
+  onUserSpeech?: () => void;
+}
 
 type ServerEvent =
   | { type: "ready" | "turn_complete" | "interrupted" }
@@ -42,137 +132,196 @@ type ServerEvent =
   | { type: "design"; design: Design }
   | { type: "flats"; flats_url: string }
   | { type: "widget"; widget: AtelierAction; occasion?: string; gender?: string }
-  | { type: "runway_started"; job: any }
+  | { type: "runway_started"; job: unknown }
+  | { type: "quote"; quote: QuoteResponse }
   | { type: "error"; message: string };
 
-export type LiveVoiceHandle = {
-  sendMessage: (text: string) => void;
-  setDesignId: (id: string) => void;
-  isActive: () => boolean;
+const KNOWN_TOOLS: VoiceTool[] = [
+  "update_design",
+  "draft_flats",
+  "open_fitting",
+  "generate_runway",
+  "get_quote",
+  "open_design_upload",
+  "open_occasion_stylist",
+];
+
+const ACTIVE_PHASES: VoicePhase[] = ["connecting", "listening", "thinking", "speaking"];
+
+// If nothing comes back after the client stops speaking, fall back to listening
+// so the hero never shows "Considering…" forever.
+const THINKING_TIMEOUT_MS = 15_000;
+// Playback chunks arrive with small gaps; wait this long before saying the Couturier stopped.
+const SPEAKING_GRACE_MS = 320;
+const NOTICE_TTL_MS = 9_000;
+
+const EMPTY_CAPTIONS: VoiceCaptions = { user: "", model: "", modelInterrupted: false };
+
+const INITIAL: VoiceState = {
+  phase: "idle",
+  tool: null,
+  muted: false,
+  notice: null,
+  error: null,
+  captions: EMPTY_CAPTIONS,
+  lastModelTurn: "",
+  micPermission: "unknown",
+  mode: "vad",
+  holding: false,
 };
 
-export interface LiveVoiceProps {
-  designId: string | null;
-  onTranscript: (role: "user" | "model", text: string) => void;
-  onTurnComplete: () => void;
-  onDesign: (design: Design) => void;
-  onError: (message: string) => void;
-  onVoiceActivity?: (active: boolean, volume: number) => void;
-  onFlats?: (flatsUrl: string) => void;
-  onWidget?: (widget: AtelierAction, occasion?: string, gender?: string) => void;
-  onRunwayStarted?: (job: any) => void;
-  onDesigning?: () => void;
-  onUserSpeech?: () => void;
-}
-
-export const LiveVoice = forwardRef<LiveVoiceHandle, LiveVoiceProps>(function LiveVoice(
-  {
-    designId,
-    onTranscript,
-    onTurnComplete,
-    onDesign,
-    onError,
-    onVoiceActivity,
-    onFlats,
-    onWidget,
-    onRunwayStarted,
-    onDesigning,
-    onUserSpeech,
-  },
-  ref
-) {
+export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
   const { auth, api } = useApp();
-  const [status, setStatus] = useState<Status>("idle");
-  const session = useRef<{ stop: () => void } | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const handlers = useRef({
-    onTranscript,
-    onTurnComplete,
-    onDesign,
-    onError,
-    onVoiceActivity,
-    onFlats,
-    onWidget,
-    onRunwayStarted,
-    onDesigning,
-    onUserSpeech,
-  });
-  handlers.current = {
-    onTranscript,
-    onTurnComplete,
-    onDesign,
-    onError,
-    onVoiceActivity,
-    onFlats,
-    onWidget,
-    onRunwayStarted,
-    onDesigning,
-    onUserSpeech,
-  };
+  const [state, setState] = useState<VoiceState>(INITIAL);
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      sendMessage: (text: string) => {
-        const ws = wsRef.current;
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "text", text }));
-        }
-      },
-      setDesignId: (id: string) => {
-        const ws = wsRef.current;
-        if (ws && ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "set_design_id", design_id: id }));
-        }
-      },
-      isActive: () => status === "connecting" || status === "listening" || status === "designing",
-    }),
-    [status]
+  const opts = useRef(options);
+  opts.current = options;
+
+  const stateRef = useRef<VoiceState>(INITIAL);
+  const levels = useRef<VoiceLevels>({ mic: 0, out: 0 });
+  const mutedRef = useRef(false);
+  const modeRef = useRef<VoiceMode>("vad");
+  const holdingRef = useRef(false);
+  const thinkRef = useRef<() => void>(() => {});
+  const session = useRef<{ stop: (finalPhase: VoicePhase) => void } | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const noticeTimer = useRef<number | null>(null);
+
+  // Synchronous: the socket handlers read stateRef right after patching, before React re-renders.
+  const patch = useCallback((p: Partial<VoiceState> | ((s: VoiceState) => Partial<VoiceState>)) => {
+    const prev = stateRef.current;
+    const next = { ...prev, ...(typeof p === "function" ? p(prev) : p) };
+    stateRef.current = next;
+    setState(next);
+  }, []);
+
+  // Ask the browser about the mic up front so the hero can warn before the first tap.
+  useEffect(() => {
+    let status: PermissionStatus | null = null;
+    const nav = navigator as Navigator & { permissions?: Permissions };
+    nav.permissions
+      ?.query({ name: "microphone" as PermissionName })
+      .then((s) => {
+        status = s;
+        patch({ micPermission: s.state as MicPermission });
+        s.onchange = () => patch({ micPermission: s.state as MicPermission });
+      })
+      .catch(() => patch({ micPermission: "unknown" }));
+    return () => {
+      if (status) status.onchange = null;
+    };
+  }, [patch]);
+
+  useEffect(() => () => session.current?.stop("idle"), []);
+
+  const showNotice = useCallback(
+    (message: string) => {
+      if (noticeTimer.current) window.clearTimeout(noticeTimer.current);
+      patch({ notice: message });
+      noticeTimer.current = window.setTimeout(() => patch({ notice: null }), NOTICE_TTL_MS);
+    },
+    [patch],
   );
 
-  useEffect(() => () => session.current?.stop(), []);
+  const start = useCallback(async () => {
+    if (ACTIVE_PHASES.includes(stateRef.current.phase)) return;
+    mutedRef.current = false;
+    holdingRef.current = false;
+    patch({ phase: "connecting", error: null, notice: null, tool: null, muted: false, holding: false, captions: EMPTY_CAPTIONS });
 
-  async function start() {
-    setStatus("connecting");
     const token = await auth.currentUser?.getIdToken();
     if (!token) {
-      setStatus("error");
-      handlers.current.onError("Not signed in yet.");
+      patch({ phase: "error", error: { kind: "auth", message: "You are not signed in yet." } });
       return;
     }
 
     const ws = new WebSocket(api.liveUrl());
     wsRef.current = ws;
     ws.binaryType = "arraybuffer";
+
+    // Both contexts are created inside the user's tap so autoplay policy is satisfied.
     const playback = new AudioContext({ sampleRate: 24000 });
+    const outAnalyser = playback.createAnalyser();
+    outAnalyser.fftSize = 64;
+    outAnalyser.smoothingTimeConstant = 0.55;
+    outAnalyser.connect(playback.destination);
+    const outData = new Uint8Array(new ArrayBuffer(outAnalyser.frequencyBinCount));
+
     const playing = new Set<AudioBufferSourceNode>();
     let nextTime = 0;
+    let lastChunkAt = 0;
     let capture: AudioContext | null = null;
     let stream: MediaStream | null = null;
+    let micAnalyser: AnalyserNode | null = null;
+    let micData: Uint8Array<ArrayBuffer> | null = null;
     let stopped = false;
-    let animFrame: number | null = null;
+    let frame: number | null = null;
+    let thinkingTimer: number | null = null;
+
+    // Caption bookkeeping for the current turn.
+    let lastRole: "user" | "model" | null = null;
+    let turnDone = true;
+
+    const setPhase = (phase: VoicePhase) => {
+      if (stopped) return;
+      if (stateRef.current.phase === phase) return;
+      patch({ phase });
+    };
+
+    const clearThinking = () => {
+      if (thinkingTimer !== null) {
+        window.clearTimeout(thinkingTimer);
+        thinkingTimer = null;
+      }
+    };
+
+    const enterThinking = () => {
+      clearThinking();
+      setPhase("thinking");
+      thinkRef.current = enterThinking;
+      thinkingTimer = window.setTimeout(() => {
+        thinkingTimer = null;
+        if (stateRef.current.phase === "thinking") setPhase("listening");
+      }, THINKING_TIMEOUT_MS);
+    };
 
     const stopPlayback = () => {
-      playing.forEach((s) => s.stop());
+      playing.forEach((s) => {
+        try {
+          s.stop();
+        } catch {
+          /* already ended */
+        }
+      });
       playing.clear();
       nextTime = 0;
     };
 
-    const stop = () => {
+    const stop = (finalPhase: VoicePhase) => {
       if (stopped) return;
       stopped = true;
       wsRef.current = null;
-      if (animFrame !== null) cancelAnimationFrame(animFrame);
-      handlers.current.onVoiceActivity?.(false, 0);
-      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "stop" }));
+      clearThinking();
+      if (frame !== null) cancelAnimationFrame(frame);
+      levels.current = { mic: 0, out: 0 };
+      if (ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(JSON.stringify({ type: "stop" }));
+        } catch {
+          /* closing anyway */
+        }
+      }
       ws.close();
+      stopPlayback();
       stream?.getTracks().forEach((t) => t.stop());
-      capture?.close();
-      playback.close();
+      capture?.close().catch(() => {});
+      playback.close().catch(() => {});
       session.current = null;
-      setStatus((s) => (s === "error" ? s : "idle"));
+      holdingRef.current = false;
+      patch({ phase: finalPhase, tool: null, muted: false, holding: false });
     };
     session.current = { stop };
+    thinkRef.current = enterThinking;
 
     const play = (data: ArrayBuffer) => {
       const pcm = new Int16Array(data);
@@ -182,12 +331,39 @@ export const LiveVoice = forwardRef<LiveVoiceHandle, LiveVoiceProps>(function Li
       buffer.copyToChannel(samples, 0);
       const src = playback.createBufferSource();
       src.buffer = buffer;
-      src.connect(playback.destination);
+      src.connect(outAnalyser);
       nextTime = Math.max(nextTime, playback.currentTime);
       src.start(nextTime);
       nextTime += buffer.duration;
       playing.add(src);
       src.onended = () => playing.delete(src);
+      lastChunkAt = performance.now();
+      clearThinking();
+      setPhase("speaking");
+    };
+
+    // One loop drives both loudness meters and the end-of-speech detection.
+    const tick = () => {
+      if (stopped) return;
+      let mic = 0;
+      const sending = !mutedRef.current && (modeRef.current !== "ptt" || holdingRef.current);
+      if (micAnalyser && micData && sending) {
+        micAnalyser.getByteFrequencyData(micData);
+        let sum = 0;
+        for (let i = 0; i < micData.length; i++) sum += micData[i];
+        mic = Math.min(1, Math.max(0, (sum / micData.length - 8) / 55));
+      }
+      outAnalyser.getByteFrequencyData(outData);
+      let osum = 0;
+      for (let i = 0; i < outData.length; i++) osum += outData[i];
+      const out = Math.min(1, Math.max(0, (osum / outData.length - 6) / 70));
+      levels.current = { mic, out };
+
+      if (stateRef.current.phase === "speaking") {
+        const drained = playback.currentTime >= nextTime;
+        if (drained && performance.now() - lastChunkAt > SPEAKING_GRACE_MS) setPhase("listening");
+      }
+      frame = requestAnimationFrame(tick);
     };
 
     const startMic = async () => {
@@ -199,114 +375,232 @@ export const LiveVoice = forwardRef<LiveVoiceHandle, LiveVoiceProps>(function Li
       await capture.audioWorklet.addModule(url);
       URL.revokeObjectURL(url);
       const node = new AudioWorkletNode(capture, "pcm-capture");
-      node.port.onmessage = (e) => ws.readyState === WebSocket.OPEN && ws.send(e.data as ArrayBuffer);
-
-      // Volume analysis for subtle voice-reactive bottom bar animation
-      const analyser = capture.createAnalyser();
-      analyser.fftSize = 64;
-      analyser.smoothingTimeConstant = 0.45;
+      node.port.onmessage = (e) => {
+        if (mutedRef.current || ws.readyState !== WebSocket.OPEN) return;
+        // Push-to-talk sends nothing between presses; the model never hears room noise.
+        if (modeRef.current === "ptt" && !holdingRef.current) return;
+        ws.send(e.data as ArrayBuffer);
+      };
+      micAnalyser = capture.createAnalyser();
+      micAnalyser.fftSize = 64;
+      micAnalyser.smoothingTimeConstant = 0.45;
+      micData = new Uint8Array(new ArrayBuffer(micAnalyser.frequencyBinCount));
       const source = capture.createMediaStreamSource(stream);
       source.connect(node);
-      source.connect(analyser);
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      const checkVolume = () => {
-        if (stopped) return;
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const avg = sum / dataArray.length;
-        const vol = Math.min(1, Math.max(0, (avg - 8) / 55));
-        handlers.current.onVoiceActivity?.(true, vol);
-        animFrame = requestAnimationFrame(checkVolume);
-      };
-      animFrame = requestAnimationFrame(checkVolume);
+      source.connect(micAnalyser);
+      frame = requestAnimationFrame(tick);
     };
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: "start", token, design_id: designId }));
-    ws.onclose = () => stop();
+    const setTool = (tool: VoiceTool | null) => patch({ tool });
+
+    ws.onopen = () =>
+      ws.send(
+        JSON.stringify({
+          type: "start",
+          token,
+          design_id: opts.current.designId,
+          mode: modeRef.current,
+          history: opts.current.getHistory?.().slice(-30),
+        }),
+      );
     ws.onerror = () => {
-      setStatus("error");
-      handlers.current.onError("Live voice connection failed.");
+      if (stopped) return;
+      patch({ error: { kind: "connection", message: "The salon could not be reached. Check your connection and try again." } });
+      stop("error");
+    };
+    ws.onclose = () => {
+      if (stopped) return;
+      // The server (or the model's session limit) hung up on us.
+      stop("dropped");
     };
     ws.onmessage = async (e) => {
+      if (stopped) return;
       if (typeof e.data !== "string") return play(e.data as ArrayBuffer);
       const msg = JSON.parse(e.data) as ServerEvent;
       switch (msg.type) {
         case "ready":
           try {
             await startMic();
-            setStatus("listening");
-          } catch {
-            setStatus("error");
-            handlers.current.onError("Microphone permission is required for live voice.");
-            stop();
+            setPhase("listening");
+          } catch (err) {
+            const name = (err as { name?: string }).name;
+            const denied = name === "NotAllowedError" || name === "PermissionDeniedError";
+            patch({
+              error: {
+                kind: "mic",
+                message: denied
+                  ? "The microphone is blocked for this site. Allow it in your browser's address bar, then try again."
+                  : "No microphone could be opened. Check that one is connected and not in use by another app.",
+              },
+              micPermission: denied ? "denied" : stateRef.current.micPermission,
+            });
+            stop("error");
           }
           break;
-        case "transcript":
-          if (msg.role === "user" && msg.text.trim()) {
-            handlers.current.onUserSpeech?.();
+        case "transcript": {
+          const text = msg.text;
+          if (msg.role === "user") {
+            if (text.trim()) {
+              opts.current.onUserSpeech?.();
+              if (stateRef.current.phase === "listening") enterThinking();
+            }
+            patch((s) => ({
+              captions:
+                turnDone || lastRole !== "user"
+                  ? { user: text, model: "", modelInterrupted: false }
+                  : { ...s.captions, user: s.captions.user + text },
+            }));
+            lastRole = "user";
+            turnDone = false;
+          } else {
+            // A new Couturier turn (after turn_complete, or after being cut off) starts a fresh
+            // caption; two turns in a row must not run into one sentence.
+            patch((s) => ({
+              captions:
+                turnDone || s.captions.modelInterrupted
+                  ? { ...s.captions, model: text, modelInterrupted: false }
+                  : { ...s.captions, model: s.captions.model + text },
+            }));
+            lastRole = "model";
+            turnDone = false;
           }
-          handlers.current.onTranscript(msg.role, msg.text);
+          opts.current.onTranscript(msg.role, text);
           break;
+        }
         case "turn_complete":
-          handlers.current.onTurnComplete();
+          turnDone = true;
+          clearThinking();
+          patch((s) => ({ lastModelTurn: s.captions.model.trim() || s.lastModelTurn }));
+          if (stateRef.current.phase === "thinking") setPhase("listening");
+          opts.current.onTurnComplete();
           break;
         case "interrupted":
           stopPlayback();
+          clearThinking();
+          patch((s) => ({
+            captions: s.captions.model ? { ...s.captions, modelInterrupted: true } : s.captions,
+          }));
+          setPhase("listening");
+          opts.current.onInterrupted?.();
           break;
-        case "tool_start":
-          if (msg.tool === "update_design") {
-            setStatus("designing");
-            handlers.current.onDesigning?.();
+        case "tool_start": {
+          const tool = KNOWN_TOOLS.includes(msg.tool as VoiceTool) ? (msg.tool as VoiceTool) : null;
+          if (tool) {
+            setTool(tool);
+            opts.current.onToolStart?.(tool);
           }
           break;
+        }
         case "designing":
-          setStatus("designing");
-          handlers.current.onDesigning?.();
+          setTool("update_design");
           break;
         case "design":
-          handlers.current.onDesign(msg.design);
-          setStatus("listening");
+          setTool(null);
+          opts.current.onDesign(msg.design);
           break;
         case "flats":
-          handlers.current.onFlats?.(msg.flats_url);
-          setStatus("listening");
+          setTool(null);
+          opts.current.onFlats?.(msg.flats_url);
           break;
         case "widget":
-          handlers.current.onWidget?.(msg.widget, msg.occasion, msg.gender);
-          setStatus("listening");
+          setTool(null);
+          opts.current.onWidget?.(msg.widget, msg.occasion, msg.gender);
+          break;
+        case "quote":
+          setTool(null);
+          opts.current.onQuote?.(msg.quote);
           break;
         case "runway_started":
-          handlers.current.onRunwayStarted?.(msg.job);
-          setStatus("listening");
+          setTool(null);
+          opts.current.onRunwayStarted?.(msg.job);
           break;
         case "error":
-          setStatus("error");
-          handlers.current.onError(msg.message);
+          // Server-side problems (a sketch that failed, a tool that threw) do not end the
+          // line; the Couturier is told to apologise and the hero shows a notice.
+          setTool(null);
+          clearThinking();
+          if (stateRef.current.phase === "thinking") setPhase("listening");
+          showNotice(friendlyNotice(msg.message));
           break;
       }
     };
-  }
+  }, [api, auth, patch, showNotice]);
 
-  const active = status === "connecting" || status === "listening" || status === "designing";
-  const label = {
-    idle: "Talk live",
-    error: "Talk live",
-    connecting: "Connecting…",
-    listening: "● Listening, tap to end",
-    designing: "✎ Sketching…",
-  }[status];
+  const stop = useCallback(() => {
+    if (session.current) session.current.stop("idle");
+    else patch({ phase: "idle", error: null, tool: null, muted: false });
+  }, [patch]);
 
-  return (
-    <button
-      type="button"
-      className={`live-voice-btn ${active ? "active" : ""} ${status === "designing" ? "designing" : ""}`}
-      onClick={() => (active ? session.current?.stop() : start())}
-      title="Real-time voice conversation with the Master Couturier (Gemini Live)"
-    >
-      <span className="voice-wave" />
-      <span>{label}</span>
-    </button>
+  const toggleMute = useCallback(() => {
+    mutedRef.current = !mutedRef.current;
+    if (mutedRef.current) levels.current = { ...levels.current, mic: 0 };
+    patch({ muted: mutedRef.current });
+  }, [patch]);
+
+  const sendMessage = useCallback((text: string) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "text", text }));
+  }, []);
+
+  const setDesignId = useCallback((id: string) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "set_design_id", design_id: id }));
+  }, []);
+
+  const dismissNotice = useCallback(() => patch({ notice: null }), [patch]);
+
+  const setMode = useCallback(
+    (mode: VoiceMode) => {
+      if (ACTIVE_PHASES.includes(stateRef.current.phase)) return;
+      modeRef.current = mode;
+      patch({ mode });
+    },
+    [patch],
   );
-});
+
+  const holdStart = useCallback(() => {
+    const ws = wsRef.current;
+    if (modeRef.current !== "ptt" || holdingRef.current || !ws || ws.readyState !== WebSocket.OPEN) return;
+    holdingRef.current = true;
+    patch({ holding: true });
+    ws.send(JSON.stringify({ type: "activity_start" }));
+  }, [patch]);
+
+  const holdEnd = useCallback(() => {
+    const ws = wsRef.current;
+    if (!holdingRef.current) return;
+    holdingRef.current = false;
+    patch({ holding: false });
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "activity_end" }));
+    if (stateRef.current.phase === "listening") thinkRef.current();
+  }, [patch]);
+
+  return {
+    ...state,
+    active: ACTIVE_PHASES.includes(state.phase),
+    levels,
+    start: () => {
+      void start();
+    },
+    stop,
+    toggleMute,
+    sendMessage,
+    setDesignId,
+    dismissNotice,
+    setMode,
+    holdStart,
+    holdEnd,
+  };
+}
+
+/** Backend error strings are written for logs; soften them for the salon. */
+function friendlyNotice(message: string): string {
+  const m = message.toLowerCase();
+  if (m.includes("sketch could not be completed") || m.includes("design generation failed")) {
+    return "That sketch did not come out. Tell the Couturier the colour, fabric and fit again and it will try once more.";
+  }
+  if (m.includes("flats generation failed")) return "The technical flats could not be drafted this time. Ask again in a moment.";
+  if (m.includes("generate_runway") || m.includes("runway")) return "The runway film could not be started. Ask again in a moment.";
+  if (m.includes("live session error")) return "The salon hit a snag. If the Couturier goes quiet, end the call and start again.";
+  return "Something went wrong on the atelier side. The Couturier is still on the line.";
+}
