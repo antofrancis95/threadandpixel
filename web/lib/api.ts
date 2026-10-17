@@ -1,5 +1,5 @@
 import type { Auth } from "firebase/auth";
-import type { Design, DesignSummary, Job, Measurements, OrderDetail, QuoteResponse, Size } from "./types";
+import type { Design, DesignSummary, DesignVersionInfo, Job, Measurements, OrderDetail, QuoteResponse, Size } from "./types";
 
 export type MessageInput = {
   text?: string;
@@ -57,6 +57,9 @@ export function createApi(baseUrl: string, auth: Auth) {
     },
     listDesigns: () => request<DesignSummary[]>("/designs"),
     getDesign: (id: string) => request<Design>(`/designs/${encodeURIComponent(id)}`),
+    listVersions: (id: string) => request<DesignVersionInfo[]>(`/designs/${encodeURIComponent(id)}/versions`),
+    restoreVersion: (id: string, version: number) =>
+      post<Design>(`/designs/${encodeURIComponent(id)}/versions/${version}/restore`),
     sendMessage: (id: string, msg: MessageInput) => post<Design>(`/designs/${encodeURIComponent(id)}/messages`, msg),
     createFlats: (id: string, size?: Size | string, measurements?: Measurements) =>
       post<{ flats_url: string; size?: Size }>(

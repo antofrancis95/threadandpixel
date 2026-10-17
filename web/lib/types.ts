@@ -28,6 +28,8 @@ export type Design = {
   suggested_action?: "none" | "fitting" | "measurements" | "runway" | "commission" | "gender" | "consultation" | "design_upload" | "occasion_stylist";
   messages?: ChatMessage[];
   is_off_topic?: boolean;
+  /** The most recent quote, when it still describes this version. */
+  latest_quote?: QuoteResponse | null;
 };
 
 export type DesignSummary = {
@@ -59,9 +61,29 @@ export type ChatMessage = {
   live?: boolean;
   /** The client spoke over this sentence before it was finished. */
   interrupted?: boolean;
+  /** A short studio note (not something the Couturier said); never persisted. */
+  kind?: "note";
 };
 
-export type Job = { job_id: string; status: "running" | "done" | "error"; video_url: string | null; error: string | null };
+export type Job = {
+  job_id: string;
+  status: "running" | "done" | "error";
+  /** rendering | finishing | done | failed */
+  stage?: string;
+  elapsed_s?: number | null;
+  typical_s?: number;
+  video_url: string | null;
+  error: string | null;
+};
+
+export type DesignVersionInfo = {
+  version: number;
+  image_url: string | null;
+  instruction?: string | null;
+  created_at?: string | null;
+  spec?: Spec | null;
+  is_current: boolean;
+};
 
 export type QuoteLine = { label: string; amount: number };
 

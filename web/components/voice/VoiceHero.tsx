@@ -37,6 +37,11 @@ export function voiceStatus(v: VoiceController, compact = false, hint?: string):
       return { primary: "Opening the salon…" };
     case "listening":
       if (v.muted) return { primary: "Microphone muted", secondary: toolLine ?? "Unmute to continue." };
+      if (v.mode === "ptt") {
+        return v.holding
+          ? { primary: "Listening", secondary: toolLine ?? "Release to let the Couturier answer." }
+          : { primary: "Hold the mic to talk", secondary: toolLine ?? (compact ? undefined : "Press and hold, speak, release.") };
+      }
       return { primary: "Listening", secondary: toolLine ?? (compact ? undefined : "Speak naturally. You can interrupt at any time.") };
     case "thinking":
       return { primary: "Considering…", secondary: toolLine };
@@ -53,23 +58,48 @@ export function voiceStatus(v: VoiceController, compact = false, hint?: string):
 }
 
 function MicButton({ voice, size }: { voice: VoiceController; size: "lg" | "sm" }) {
-  const { phase, muted, active } = voice;
+  const { phase, muted, active, mode, holding } = voice;
   const connecting = phase === "connecting";
-  const label = active
-    ? muted
-      ? "Unmute the microphone"
-      : "Mute the microphone"
-    : "Talk live with the Couturier";
+  const ptt = active && mode === "ptt";
+  const label = !active
+    ? "Talk live with the Couturier"
+    : ptt
+      ? "Hold to talk"
+      : muted
+        ? "Unmute the microphone"
+        : "Mute the microphone";
+  // Push-to-talk: press and hold (pointer or Space/Enter); release to let the Couturier answer.
+  const hold = ptt
+    ? {
+        onPointerDown: (e: React.PointerEvent) => {
+          e.preventDefault();
+          voice.holdStart();
+        },
+        onPointerUp: voice.holdEnd,
+        onPointerLeave: voice.holdEnd,
+        onPointerCancel: voice.holdEnd,
+        onKeyDown: (e: React.KeyboardEvent) => {
+          if ((e.key === " " || e.key === "Enter") && !e.repeat) {
+            e.preventDefault();
+            voice.holdStart();
+          }
+        },
+        onKeyUp: (e: React.KeyboardEvent) => {
+          if (e.key === " " || e.key === "Enter") voice.holdEnd();
+        },
+      }
+    : { onClick: active ? voice.toggleMute : voice.start };
   return (
     <button
       type="button"
       className={`voice-mic voice-mic-${size}`}
       data-phase={phase}
-      data-muted={muted || undefined}
-      onClick={active ? voice.toggleMute : voice.start}
+      data-muted={muted || (ptt && !holding) || undefined}
+      data-holding={holding || undefined}
+      {...hold}
       disabled={connecting}
       aria-label={label}
-      aria-pressed={active ? muted : undefined}
+      aria-pressed={active && !ptt ? muted : undefined}
       title={label}
     >
       {active && muted ? <MicOffIcon size={size === "lg" ? 30 : 18} /> : <MicIcon size={size === "lg" ? 30 : 18} />}
@@ -104,6 +134,27 @@ function Captions({ voice, compact }: { voice: VoiceController; compact?: boolea
           <span className="voice-caption-text">{model}</span>
         </p>
       )}
+    </div>
+  );
+}
+
+function ModeToggle({ voice, compact }: { voice: VoiceController; compact?: boolean }) {
+  const locked = voice.active;
+  return (
+    <div className={`voice-mode ${compact ? "compact" : ""}`} role="radiogroup" aria-label="Microphone mode" title={locked ? "End the call to change the mode" : undefined}>
+      {(["vad", "ptt"] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          role="radio"
+          aria-checked={voice.mode === m}
+          className={`chip-btn ${voice.mode === m ? "highlight" : ""}`}
+          disabled={locked}
+          onClick={() => voice.setMode(m)}
+        >
+          {m === "vad" ? "Hands-free" : "Hold to talk"}
+        </button>
+      ))}
     </div>
   );
 }
@@ -161,8 +212,17 @@ export function VoiceHero({
 
         <div className="voice-stage">
           <MicButton voice={voice} size="lg" />
-          <VoiceThread phase={voice.phase} tool={voice.tool} muted={voice.muted} levels={voice.levels} shape="siri" size={240} barHeight={64} />
+          <VoiceThread
+            phase={voice.phase}
+            tool={voice.tool}
+            muted={voice.muted || (voice.active && voice.mode === "ptt" && !voice.holding)}
+            levels={voice.levels}
+            shape="siri"
+            size={240}
+            barHeight={64}
+          />
         </div>
+        {!voice.active && <ModeToggle voice={voice} />}
 
         <div className="voice-status">
           <p className="voice-status-primary">{status.primary}</p>
@@ -228,7 +288,15 @@ export function VoiceHero({
             </p>
             <Captions voice={voice} compact />
           </div>
-          <VoiceThread phase={voice.phase} tool={voice.tool} muted={voice.muted} levels={voice.levels} shape="siri" size={132} barHeight={40} />
+          <VoiceThread
+            phase={voice.phase}
+            tool={voice.tool}
+            muted={voice.muted || (voice.mode === "ptt" && !voice.holding)}
+            levels={voice.levels}
+            shape="siri"
+            size={132}
+            barHeight={40}
+          />
           <button type="button" className="secondary small end" onClick={voice.stop} aria-label="End the conversation" title="End the conversation">
             <CloseIcon size={13} />
             <span>End</span>
@@ -256,6 +324,7 @@ export function VoiceHero({
             <p className="voice-status-primary">{status.primary}</p>
             {status.secondary && <p className="voice-status-secondary">{status.secondary}</p>}
           </div>
+          <ModeToggle voice={voice} compact />
         </>
       )}
       <Announcer voice={voice} />

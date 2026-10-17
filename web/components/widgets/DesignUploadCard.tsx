@@ -45,7 +45,7 @@ export function DesignUploadCard({
         )}
       </div>
 
-      <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", margin: "0 0 0.85rem", lineHeight: 1.45 }}>
+      <p className="inline-widget-lede">
         Upload a sketch, garment reference photo, or design concept. The Master Couturier will analyze its silhouette and lines, curate certified atelier fabrics, and sculpt your outfit based on it:
       </p>
 
@@ -87,7 +87,7 @@ export function DesignUploadCard({
 
       {/* Target Tailoring Silhouette */}
       <div style={{ marginBottom: "0.85rem" }}>
-        <label style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.4rem" }}>
+        <label className="w-label">
           Tailoring Silhouette
         </label>
         <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
@@ -126,7 +126,7 @@ export function DesignUploadCard({
       {/* Size Selection */}
       <div style={{ marginBottom: "0.85rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.35rem" }}>
-          <label style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+          <label className="w-label">
             Proportion Size (Flats &amp; Measurements)
           </label>
           <span style={{ fontSize: "var(--text-xs)", color: "var(--gold-dark)", fontWeight: 500 }}>
@@ -150,7 +150,7 @@ export function DesignUploadCard({
 
       {/* Optional Design Notes */}
       <div style={{ marginBottom: "1rem" }}>
-        <label htmlFor="design-notes-input" style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
+        <label htmlFor="design-notes-input" className="w-label">
           Bespoke Customization Notes (Optional)
         </label>
         <textarea

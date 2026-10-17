@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CloseIcon, FilmIcon, RefreshIcon, SparkleIcon } from "@/components/icons";
-import { JOB_COPY, formatElapsed, type StudioJob } from "@/lib/useJobs";
+import { JOB_COPY, STAGE_LABELS, formatElapsed, jobProgress, type StudioJob } from "@/lib/useJobs";
 
 /**
  * The runway card asks for the film and shows how it is going. The job itself is
@@ -52,10 +52,14 @@ export function RunwayCard({
           </span>
           <div className="job-progress-text">
             <strong>
-              {JOB_COPY.runway.running} · {formatElapsed(job.startedAt, now)}
+              {job.stage && STAGE_LABELS[job.stage] ? STAGE_LABELS[job.stage] : JOB_COPY.runway.running} · {formatElapsed(job.startedAt, now)}
+              {job.typicalS ? ` of about ${formatElapsed(0, job.typicalS * 1000)}` : ""}
             </strong>
             <span>
-              This {JOB_COPY.runway.usually}. Keep designing; the film goes to the Runway tab when it is ready.
+              {job.stage === "finishing" ? "The render is done; saving the film." : `Veo is rendering the walk; this ${JOB_COPY.runway.usually}.`} Keep designing; the film goes to the Runway tab when it is ready.
+            </span>
+            <span className="job-progress-bar" aria-hidden="true">
+              <span style={{ transform: `scaleX(${jobProgress(job, now).toFixed(3)})` }} />
             </span>
           </div>
         </div>

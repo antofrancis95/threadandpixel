@@ -70,7 +70,7 @@ export function MeasurementCard({
         )}
       </div>
 
-      <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", margin: "0 0 0.75rem" }}>
+      <p className="inline-widget-lede">
         Select standard couture sizing or enter your bespoke measurements for pattern-making:
       </p>
 

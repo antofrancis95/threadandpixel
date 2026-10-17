@@ -19,6 +19,10 @@ export type StudioJob = {
   finishedAt?: number;
   resultUrl?: string;
   error?: string;
+  /** From the server: rendering, finishing, done, failed. */
+  stage?: string;
+  /** How long this kind of job usually takes, in seconds. */
+  typicalS?: number;
 };
 
 export const JOB_COPY: Record<StudioJobKind, { running: string; done: string; failed: string; usually: string }> = {
@@ -63,10 +67,13 @@ export function useStudioJobs(api: Api, onSettled: (job: StudioJob) => void) {
     return () => window.clearTimeout(t);
   }, [jobs]);
 
-  /** Runs `work`, shows it as a job while it runs, and resolves with the result URL. */
+  /** Runs `work`, shows it as a job while it runs, and resolves with the result URL. `report` updates the chip. */
   const track = useCallback(
-    (kind: StudioJobKind, designId: string, work: () => Promise<string>): Promise<string> => {
-      const job: StudioJob = { id: `${kind}-${designId}-${Date.now()}`, kind, designId, status: "running", startedAt: Date.now() };
+    (kind: StudioJobKind, designId: string, work: (report: (patch: Partial<StudioJob>) => void) => Promise<string>): Promise<string> => {
+      const job: StudioJob = { id: `${kind}-${designId}-${Date.now()}`, kind, designId, status: "running", startedAt: Date.now(), typicalS: kind === "runway" ? 90 : 40 };
+      const report = (patch: Partial<StudioJob>) => {
+        if (alive.current) setJobs((js) => js.map((j) => (j.id === job.id ? { ...j, ...patch } : j)));
+      };
       // One job of a kind per design: a new run replaces a finished one.
       setJobs((js) => [...js.filter((j) => !(j.kind === kind && j.designId === designId)), job]);
       const finish = (patch: Partial<StudioJob>) => {
@@ -76,7 +83,7 @@ export function useStudioJobs(api: Api, onSettled: (job: StudioJob) => void) {
         settled.current(done);
         return done;
       };
-      return work().then(
+      return work(report).then(
         (url) => {
           finish({ status: "done", resultUrl: url });
           return url;
@@ -91,11 +98,13 @@ export function useStudioJobs(api: Api, onSettled: (job: StudioJob) => void) {
   );
 
   const pollRunway = useCallback(
-    async (jobId: string): Promise<string> => {
+    async (jobId: string, report?: (patch: Partial<StudioJob>) => void): Promise<string> => {
       let job = await api.getJob(jobId);
+      report?.({ stage: job.stage, typicalS: job.typical_s });
       while (job.status === "running" && alive.current) {
         await new Promise((r) => setTimeout(r, POLL_MS));
         job = await api.getJob(jobId);
+        report?.({ stage: job.stage, typicalS: job.typical_s });
       }
       if (job.status === "error") throw new Error(job.error ?? "Video generation failed");
       if (!job.video_url) throw new Error("No film came back from the studio");
@@ -107,11 +116,12 @@ export function useStudioJobs(api: Api, onSettled: (job: StudioJob) => void) {
   /** Start a runway film for a design and follow it to the end. */
   const startRunway = useCallback(
     (designId: string) =>
-      track("runway", designId, async () => {
+      track("runway", designId, async (report) => {
         const started = await api.startRunway(designId);
+        report({ stage: started.stage, typicalS: started.typical_s });
         if (started.status === "done" && started.video_url) return started.video_url;
         if (started.status === "error") throw new Error(started.error ?? "Video generation failed");
-        return pollRunway(started.job_id);
+        return pollRunway(started.job_id, report);
       }).catch(() => undefined),
     [api, pollRunway, track],
   );
@@ -119,7 +129,7 @@ export function useStudioJobs(api: Api, onSettled: (job: StudioJob) => void) {
   /** Follow a runway job somebody else started (the live Couturier's generate_runway tool). */
   const adoptRunway = useCallback(
     (designId: string, jobId: string) => {
-      void track("runway", designId, () => pollRunway(jobId)).catch(() => undefined);
+      void track("runway", designId, (report) => pollRunway(jobId, report)).catch(() => undefined);
     },
     [pollRunway, track],
   );
@@ -127,6 +137,21 @@ export function useStudioJobs(api: Api, onSettled: (job: StudioJob) => void) {
   const dismiss = useCallback((id: string) => setJobs((js) => js.filter((j) => j.id !== id)), []);
 
   return { jobs, track, startRunway, adoptRunway, dismiss };
+}
+
+export const STAGE_LABELS: Record<string, string> = {
+  rendering: "Rendering",
+  finishing: "Finishing",
+  done: "Ready",
+  failed: "Failed",
+};
+
+/** 0..1 against the typical duration, held under 1 until it is really done. */
+export function jobProgress(job: StudioJob, now = Date.now()): number {
+  if (job.status === "done") return 1;
+  if (job.stage === "finishing") return 0.95;
+  const typical = (job.typicalS ?? 90) * 1000;
+  return Math.min(0.9, (now - job.startedAt) / typical);
 }
 
 export function formatElapsed(startedAt: number, now = Date.now()): string {

@@ -86,7 +86,7 @@ export function FittingRoomCard({
         </div>
       )}
 
-      <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", margin: "0 0 0.75rem" }}>
+      <p className="inline-widget-lede">
         {hasExistingPortrait
           ? "Or upload a different portrait to replace your saved fitting photo:"
           : "Upload a full-length, front-facing portrait to drape this garment directly onto yourself:"}

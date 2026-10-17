@@ -314,6 +314,8 @@ export default function AtelierStudio() {
       .then((d) => {
         setDesign(d);
         setMessages(d.messages ?? []);
+        setQuoteData(d.latest_quote ?? null);
+        void seedVersions(d.design_id);
         if (d.suggested_action && d.suggested_action !== "none") {
           setActiveWidget(d.suggested_action as AtelierAction);
         }
@@ -404,6 +406,8 @@ export default function AtelierStudio() {
       localStorage.setItem(STORAGE_KEY, d.design_id);
       setDesign(d);
       setMessages(d.messages ?? []);
+      setQuoteData(d.latest_quote ?? null);
+      void seedVersions(d.design_id);
       setActiveTab("editorial");
       setAssetErrors({});
       if (d.suggested_action && d.suggested_action !== "none") {
@@ -496,10 +500,7 @@ export default function AtelierStudio() {
     setActiveTab("tryon");
     setMessages((m) => [
       ...m,
-      {
-        role: "model",
-        text: "Thank you, I have received your portrait. I am draping this creation onto you in the salon mirror now. This takes a moment.",
-      },
+      { role: "model", kind: "note", text: "Portrait received. Draping it in the salon mirror…" },
     ]);
     tellVoice(
       `[ATELIER EVENT]: The client just uploaded their portrait ('${file.name}') for the virtual fitting room. ` +
@@ -515,10 +516,7 @@ export default function AtelierStudio() {
       setActiveWidget(null);
       setMessages((m) => [
         ...m,
-        {
-          role: "model",
-          text: "I have draped this bespoke creation onto your portrait in the salon mirror. You may inspect the fit on the showcase board.",
-        },
+        { role: "model", kind: "note", text: "Fitting ready on the Fitting tab." },
       ]);
       tellVoice(
         `[ATELIER UPDATE]: The garment has been draped onto the client's portrait and is now ready in the Fitting tab of the showcase board. ` +
@@ -551,10 +549,7 @@ export default function AtelierStudio() {
       setActiveWidget(null);
       setMessages((m) => [
         ...m,
-        {
-          role: "model",
-          text: "I have draped this updated silhouette onto your saved portrait in the salon mirror.",
-        },
+        { role: "model", kind: "note", text: "Draped onto your saved portrait. See the Fitting tab." },
       ]);
       tellVoice(
         `[ATELIER UPDATE]: The garment has been draped onto the client's saved portrait and is ready in the Fitting tab. ` +
@@ -752,6 +747,53 @@ export default function AtelierStudio() {
         `[ATELIER UPDATE]: The runway film failed (${job.error}) and nothing new is on the showcase board. Do NOT say it is ready. ` +
           `Speak 1 short sentence apologising and offering to try again.`,
       );
+    }
+  }
+
+  // Earlier drapes come from the server so looking back works after a reload; the session's
+  // richer snapshots (flats, fitting, runway) are kept where they exist.
+  async function seedVersions(designId: string) {
+    try {
+      const list = await api.listVersions(designId);
+      setHistory((h) => {
+        const have = h[designId] ?? [];
+        const merged = [...have];
+        for (const v of list) {
+          if (!v.image_url || merged.some((x) => x.version === v.version)) continue;
+          merged.push({ version: v.version, image_url: v.image_url, flats_url: null, tryon_url: null, runway_url: null, note: v.instruction ?? undefined });
+        }
+        return { ...h, [designId]: merged.sort((a, b) => a.version - b.version) };
+      });
+    } catch {
+      // the strip simply shows what this session has seen
+    }
+  }
+
+  const [restoring, setRestoring] = useState(false);
+
+  async function restoreVersion(version: number) {
+    if (!design || restoring) return;
+    setRestoring(true);
+    setError(null);
+    try {
+      const d = await api.restoreVersion(design.design_id, version);
+      setDesign(d);
+      if (d.messages?.length) setMessages(d.messages);
+      setQuoteData(null);
+      setActiveWidget(null);
+      setActiveTab("editorial");
+      setAssetErrors({});
+      setViewingVersion(null);
+      void seedVersions(d.design_id);
+      loadArchive();
+      tellVoice(
+        `[ATELIER UPDATE]: The client brought back version ${version}; it is now version ${d.version} on the showcase board, without flats, fitting or runway. ` +
+          `Speak 1 short, warm sentence confirming it and offering to redraft the flats.`,
+      );
+    } catch (e) {
+      setError(friendlyError(e));
+    } finally {
+      setRestoring(false);
     }
   }
 
@@ -1033,6 +1075,9 @@ export default function AtelierStudio() {
 
   return (
     <div className="atelier-app">
+      <a className="skip-link" href="#studio-main">
+        Skip to the studio
+      </a>
       <header className="topbar">
         <div className="brand">
           <Link href="/" title="Thread & Pixel home">
@@ -1199,7 +1244,7 @@ export default function AtelierStudio() {
         </button>
       </div>
 
-      <main className="studio">
+      <main className="studio" id="studio-main" tabIndex={-1}>
         {initialLoading ? (
           <div className="grid" data-pane={mobilePane}>
             <section className="panel chat-panel">
@@ -1290,7 +1335,7 @@ export default function AtelierStudio() {
         />
 
         {/* Right Column: Couture Showcase & Moodboard */}
-        <section className="panel showcase-panel">
+        <section className="panel showcase-panel" aria-label="Couture showcase">
           <div className="panel-head">
             <h2 className="showcase-title">
               <span>Couture Showcase</span>
@@ -1697,6 +1742,8 @@ export default function AtelierStudio() {
                 current={design.version}
                 viewing={lookingBack ? viewingVersion : null}
                 onView={setViewingVersion}
+                onRestore={restoreVersion}
+                restoring={restoring}
               />
             )}
           </div>

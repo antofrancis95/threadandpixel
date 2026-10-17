@@ -71,6 +71,9 @@ export type VoiceLevels = { mic: number; out: number };
 
 export type MicPermission = "unknown" | "prompt" | "granted" | "denied";
 
+/** Hands-free lets the model decide when you have finished; hold-to-talk lets you. */
+export type VoiceMode = "vad" | "ptt";
+
 export type VoiceState = {
   phase: VoicePhase;
   tool: VoiceTool | null;
@@ -83,6 +86,9 @@ export type VoiceState = {
   /** The Couturier's last finished sentence; announced to assistive tech. */
   lastModelTurn: string;
   micPermission: MicPermission;
+  mode: VoiceMode;
+  /** Push-to-talk: the mic is held down right now. */
+  holding: boolean;
 };
 
 export type VoiceController = VoiceState & {
@@ -96,6 +102,10 @@ export type VoiceController = VoiceState & {
   sendMessage: (text: string) => void;
   setDesignId: (id: string) => void;
   dismissNotice: () => void;
+  /** Only while idle; the mode is fixed for the length of a call. */
+  setMode: (mode: VoiceMode) => void;
+  holdStart: () => void;
+  holdEnd: () => void;
 };
 
 export interface LiveVoiceOptions {
@@ -156,6 +166,8 @@ const INITIAL: VoiceState = {
   captions: EMPTY_CAPTIONS,
   lastModelTurn: "",
   micPermission: "unknown",
+  mode: "vad",
+  holding: false,
 };
 
 export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
@@ -168,6 +180,9 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
   const stateRef = useRef<VoiceState>(INITIAL);
   const levels = useRef<VoiceLevels>({ mic: 0, out: 0 });
   const mutedRef = useRef(false);
+  const modeRef = useRef<VoiceMode>("vad");
+  const holdingRef = useRef(false);
+  const thinkRef = useRef<() => void>(() => {});
   const session = useRef<{ stop: (finalPhase: VoicePhase) => void } | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const noticeTimer = useRef<number | null>(null);
@@ -211,7 +226,8 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
   const start = useCallback(async () => {
     if (ACTIVE_PHASES.includes(stateRef.current.phase)) return;
     mutedRef.current = false;
-    patch({ phase: "connecting", error: null, notice: null, tool: null, muted: false, captions: EMPTY_CAPTIONS });
+    holdingRef.current = false;
+    patch({ phase: "connecting", error: null, notice: null, tool: null, muted: false, holding: false, captions: EMPTY_CAPTIONS });
 
     const token = await auth.currentUser?.getIdToken();
     if (!token) {
@@ -262,6 +278,7 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
     const enterThinking = () => {
       clearThinking();
       setPhase("thinking");
+      thinkRef.current = enterThinking;
       thinkingTimer = window.setTimeout(() => {
         thinkingTimer = null;
         if (stateRef.current.phase === "thinking") setPhase("listening");
@@ -300,9 +317,11 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
       capture?.close().catch(() => {});
       playback.close().catch(() => {});
       session.current = null;
-      patch({ phase: finalPhase, tool: null, muted: false });
+      holdingRef.current = false;
+      patch({ phase: finalPhase, tool: null, muted: false, holding: false });
     };
     session.current = { stop };
+    thinkRef.current = enterThinking;
 
     const play = (data: ArrayBuffer) => {
       const pcm = new Int16Array(data);
@@ -327,7 +346,8 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
     const tick = () => {
       if (stopped) return;
       let mic = 0;
-      if (micAnalyser && micData && !mutedRef.current) {
+      const sending = !mutedRef.current && (modeRef.current !== "ptt" || holdingRef.current);
+      if (micAnalyser && micData && sending) {
         micAnalyser.getByteFrequencyData(micData);
         let sum = 0;
         for (let i = 0; i < micData.length; i++) sum += micData[i];
@@ -357,6 +377,8 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
       const node = new AudioWorkletNode(capture, "pcm-capture");
       node.port.onmessage = (e) => {
         if (mutedRef.current || ws.readyState !== WebSocket.OPEN) return;
+        // Push-to-talk sends nothing between presses; the model never hears room noise.
+        if (modeRef.current === "ptt" && !holdingRef.current) return;
         ws.send(e.data as ArrayBuffer);
       };
       micAnalyser = capture.createAnalyser();
@@ -377,6 +399,7 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
           type: "start",
           token,
           design_id: opts.current.designId,
+          mode: modeRef.current,
           history: opts.current.getHistory?.().slice(-30),
         }),
       );
@@ -523,6 +546,32 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
 
   const dismissNotice = useCallback(() => patch({ notice: null }), [patch]);
 
+  const setMode = useCallback(
+    (mode: VoiceMode) => {
+      if (ACTIVE_PHASES.includes(stateRef.current.phase)) return;
+      modeRef.current = mode;
+      patch({ mode });
+    },
+    [patch],
+  );
+
+  const holdStart = useCallback(() => {
+    const ws = wsRef.current;
+    if (modeRef.current !== "ptt" || holdingRef.current || !ws || ws.readyState !== WebSocket.OPEN) return;
+    holdingRef.current = true;
+    patch({ holding: true });
+    ws.send(JSON.stringify({ type: "activity_start" }));
+  }, [patch]);
+
+  const holdEnd = useCallback(() => {
+    const ws = wsRef.current;
+    if (!holdingRef.current) return;
+    holdingRef.current = false;
+    patch({ holding: false });
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "activity_end" }));
+    if (stateRef.current.phase === "listening") thinkRef.current();
+  }, [patch]);
+
   return {
     ...state,
     active: ACTIVE_PHASES.includes(state.phase),
@@ -535,6 +584,9 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
     sendMessage,
     setDesignId,
     dismissNotice,
+    setMode,
+    holdStart,
+    holdEnd,
   };
 }
 

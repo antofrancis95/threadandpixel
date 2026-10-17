@@ -20,11 +20,16 @@ export function VersionStrip({
   current,
   viewing,
   onView,
+  onRestore,
+  restoring = false,
 }: {
   versions: DesignVersion[];
   current: number;
   viewing: number | null;
   onView: (version: number | null) => void;
+  /** Bring this version back as a new current version. */
+  onRestore?: (version: number) => void;
+  restoring?: boolean;
 }) {
   if (versions.length < 2) return null;
   return (
@@ -52,7 +57,12 @@ export function VersionStrip({
       {viewing !== null && viewing !== current && (
         <span className="version-strip-note" role="status">
           Looking at v{viewing} of v{current}.
-          <button type="button" className="version-strip-back" onClick={() => onView(null)}>
+          {onRestore && (
+            <button type="button" className="version-strip-back" onClick={() => onRestore(viewing)} disabled={restoring}>
+              {restoring ? "Bringing it back…" : "Make this current"}
+            </button>
+          )}
+          <button type="button" className="version-strip-back" onClick={() => onView(null)} disabled={restoring}>
             Back to current
           </button>
         </span>

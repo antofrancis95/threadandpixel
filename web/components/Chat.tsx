@@ -66,7 +66,7 @@ export function Chat({
   }
 
   return (
-    <section className="panel chat-panel">
+    <section className="panel chat-panel" aria-label="Conversation with the Couturier">
       <div className="panel-head">
         <div>
           <h2>The Couturier</h2>
@@ -95,6 +95,13 @@ export function Chat({
 
         {messages.map((m, i) => {
           const isLatestModel = m.role === "model" && i === messages.length - 1;
+          if (m.kind === "note") {
+            return (
+              <div key={i} className="message-row note" role="status">
+                <span className="chat-note">{m.text}</span>
+              </div>
+            );
+          }
           return (
             <div key={i} className={`message-row ${m.role}`}>
               <div className={`bubble ${m.role} ${m.live ? "live-indicator" : ""} ${m.interrupted ? "cut" : ""}`}>

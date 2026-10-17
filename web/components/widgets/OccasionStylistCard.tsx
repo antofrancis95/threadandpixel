@@ -96,13 +96,13 @@ export function OccasionStylistCard({
         )}
       </div>
 
-      <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", margin: "0 0 0.85rem", lineHeight: 1.45 }}>
+      <p className="inline-widget-lede">
         Tell the Couturier about your upcoming event and share your photo. We will design an exclusive bespoke silhouette curated for your frame and occasion, and drape it directly onto you:
       </p>
 
       {/* Occasion Input with Suggestions */}
       <div style={{ marginBottom: "0.85rem" }}>
-        <label htmlFor="occasion-text-input" style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
+        <label htmlFor="occasion-text-input" className="w-label">
           The Occasion / Dress Code
         </label>
         <input
@@ -143,7 +143,7 @@ export function OccasionStylistCard({
       {/* Portrait Photo Section */}
       <div style={{ marginBottom: "0.85rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.35rem" }}>
-          <label style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+          <label className="w-label">
             Your Portrait Photo
           </label>
           <span style={{ fontSize: "var(--text-xs)", color: "var(--gold-dark)", fontWeight: 500 }}>
@@ -242,7 +242,7 @@ export function OccasionStylistCard({
       {/* Target Silhouette Gender */}
       <div style={{ marginBottom: "0.85rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.35rem" }}>
-          <label style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+          <label className="w-label">
             Target Wardrobe
           </label>
           {!gender && (
@@ -277,7 +277,7 @@ export function OccasionStylistCard({
 
       {/* Size Selection */}
       <div style={{ marginBottom: "0.85rem" }}>
-        <label style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
+        <label className="w-label">
           Proportion Size
         </label>
         <div className="size-selector">
@@ -297,7 +297,7 @@ export function OccasionStylistCard({
 
       {/* Optional Styling Preferences */}
       <div style={{ marginBottom: "1rem" }}>
-        <label htmlFor="occasion-pref-input" style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
+        <label htmlFor="occasion-pref-input" className="w-label">
           Personal Preferences (Optional)
         </label>
         <input

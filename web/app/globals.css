@@ -4392,3 +4392,131 @@ button.archive-item-card:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
+
+/* =========================================================================
+   Finish: job progress bars, push-to-talk, notes, skip link, widget labels
+   ========================================================================= */
+.job-chip-bar,
+.job-progress-bar {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(197, 168, 128, 0.25);
+  overflow: hidden;
+}
+
+.job-chip-bar {
+  width: 44px;
+}
+
+.job-progress-bar {
+  width: 100%;
+  margin-top: 0.4rem;
+}
+
+.job-chip-bar > span,
+.job-progress-bar > span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--gold);
+  transform-origin: left;
+  transition: transform 1s linear;
+}
+
+.voice-mode {
+  display: inline-flex;
+  gap: 0.3rem;
+  padding: 0.2rem;
+  border-radius: var(--radius-full);
+  background: var(--ivory);
+  border: 1px solid var(--line-light);
+  margin-top: 0.4rem;
+}
+
+.voice-mode .chip-btn {
+  font-size: var(--text-xs);
+  padding: 0.3rem 0.7rem;
+  border-color: transparent;
+}
+
+.voice-mode .chip-btn:not(.highlight) {
+  background: transparent;
+}
+
+.voice-mode .chip-btn:disabled {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.voice-mode.compact {
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.voice-mic[data-holding] {
+  background: linear-gradient(180deg, #FFFFFF 0%, #F5EDE0 100%);
+  color: var(--ink);
+  border-color: var(--gold);
+  box-shadow:
+    0 0 0 8px var(--gold-tint),
+    0 8px 24px -8px rgba(197, 168, 128, 0.6);
+  transform: scale(1.04);
+}
+
+.message-row.note {
+  align-items: center;
+}
+
+.chat-note {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+  background: var(--ivory);
+  border: 1px solid var(--line-light);
+}
+
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: -5rem;
+  z-index: 200;
+  padding: 0.6rem 1.1rem;
+  background: var(--ink);
+  color: #FFFFFF;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: top var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+}
+
+.skip-link:focus-visible {
+  top: 1rem;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.studio:focus {
+  outline: none;
+}
+
+.w-label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+@media (max-width: 767px) {
+  .voice-dock .voice-mode.compact {
+    display: none;
+  }
+}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckIcon, CloseIcon, RefreshIcon, SparkleIcon } from "@/components/icons";
-import { JOB_COPY, formatElapsed, type StudioJob } from "@/lib/useJobs";
+import { JOB_COPY, STAGE_LABELS, formatElapsed, jobProgress, type StudioJob } from "@/lib/useJobs";
 
 /** Status chips for atelier work in progress: what is running, for how long, and what is ready. */
 export function JobChips({
@@ -35,8 +35,11 @@ export function JobChips({
               <span className="spin-silk">
                 <SparkleIcon size={11} />
               </span>
-              <span>{copy.running}</span>
+              <span>{job.stage && STAGE_LABELS[job.stage] ? `${copy.running} · ${STAGE_LABELS[job.stage].toLowerCase()}` : copy.running}</span>
               <span className="job-chip-time">{formatElapsed(job.startedAt, now)}</span>
+              <span className="job-chip-bar" aria-hidden="true">
+                <span style={{ transform: `scaleX(${jobProgress(job, now).toFixed(3)})` }} />
+              </span>
             </span>
           );
         }
