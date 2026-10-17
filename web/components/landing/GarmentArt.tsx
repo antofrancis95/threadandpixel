@@ -6,6 +6,8 @@
  * swapping the components in GarmentStory.tsx and Showcase.tsx.
  */
 
+import { LandingVoiceWave } from "./LandingVoiceWave";
+
 const FRONT =
   "M72,40 Q100,52 128,40 L138,46 L162,200 L144,200 L128,96 L124,140 L160,300 Q100,312 40,300 L76,140 L72,96 L56,200 L38,200 L62,46 Z";
 const BACK =
@@ -142,11 +144,7 @@ export function GarmentOnModel() {
 export function VoiceToSilhouette() {
   return (
     <div style={{ display: "grid", placeItems: "center", gap: "1.25rem", height: "100%", width: "100%", gridTemplateRows: "auto minmax(0, 1fr)" }}>
-      <div className="lp-wave" aria-hidden="true" style={{ height: 40, gap: 4 }}>
-        {Array.from({ length: 28 }).map((_, i) => (
-          <i key={i} style={{ animationDuration: `${1.1 + (i % 5) * 0.12}s` }} />
-        ))}
-      </div>
+      <LandingVoiceWave width={240} height={64} />
       <svg className="lp-garment" viewBox="0 0 200 320" role="img" aria-label="Faint first outline of the dress emerging" style={{ opacity: 0.55, height: "100%", minHeight: 0 }}>
         <path className="ink-soft draw" d={FRONT} strokeDasharray="4 6" />
       </svg>

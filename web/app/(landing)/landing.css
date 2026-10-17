@@ -1011,9 +1011,9 @@ body:has(.landing-root) {
   color: var(--muted);
   font-size: 0.8rem;
 }
-.lp-composer .lp-wave {
+.lp-composer-wave {
   margin-left: auto;
-  height: 22px;
+  display: inline-flex;
 }
 .lp-composer .live {
   display: inline-flex;

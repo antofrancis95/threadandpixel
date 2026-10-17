@@ -1,6 +1,7 @@
 import { ClipboardIcon, FilmIcon, HourglassIcon, MicIcon, MirrorIcon, RecycleIcon, RulerIcon, ScissorsIcon, SparkleIcon } from "@/components/icons";
 import { GarmentFlat, GarmentOnModel, GarmentRender } from "./GarmentArt";
 import { WordmarkText } from "./LandingNav";
+import { LandingVoiceWave } from "./LandingVoiceWave";
 import { LazyVideo } from "./LazyVideo";
 import { Picture } from "./Picture";
 import { Reveal } from "./Reveal";
@@ -120,10 +121,8 @@ export function Showcase({ media }: { media: LandingMedia }) {
                 </div>
                 <div className="lp-composer" aria-hidden="true">
                   <span>Listening…</span>
-                  <span className="lp-wave">
-                    {Array.from({ length: 14 }).map((_, i) => (
-                      <i key={i} style={{ animationDuration: `${1 + (i % 4) * 0.15}s` }} />
-                    ))}
+                  <span className="lp-composer-wave">
+                    <LandingVoiceWave width={96} height={28} />
                   </span>
                   <span className="live">
                     <MicIcon size={15} />
