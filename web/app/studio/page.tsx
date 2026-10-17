@@ -36,8 +36,9 @@ import {
   WomenswearIcon,
 } from "@/components/icons";
 import { StaticDrape } from "@/components/landing/HeroCloth";
-import { LiveVoice, type LiveVoiceHandle } from "@/components/LiveVoice";
+import { useLiveVoice } from "@/components/LiveVoice";
 import { ChatSkeleton, ShowcaseSkeleton } from "@/components/skeletons";
+import { VoiceHero } from "@/components/voice/VoiceHero";
 import { CommissionCard } from "@/components/widgets/CommissionCard";
 import { DesignUploadCard } from "@/components/widgets/DesignUploadCard";
 import { FittingRoomCard } from "@/components/widgets/FittingRoomCard";
@@ -94,10 +95,35 @@ export default function AtelierStudio() {
   const [quoteBusy, setQuoteBusy] = useState(false);
   const [tryonBusy, setTryonBusy] = useState(false);
   const [assetErrors, setAssetErrors] = useState<Record<string, boolean>>({});
-  const [voiceActive, setVoiceActive] = useState(false);
-  const [voiceVolume, setVoiceVolume] = useState(0);
-  const [voiceDesigning, setVoiceDesigning] = useState(false);
-  const liveVoiceRef = useRef<LiveVoiceHandle | null>(null);
+
+  // The live Couturier. Callbacks are plain function declarations below (hoisted);
+  // the hook reads them through a ref each render.
+  const voice = useLiveVoice({
+    designId: design?.design_id ?? null,
+    onTranscript: liveTranscript,
+    onTurnComplete: liveTurnComplete,
+    onInterrupted: liveInterrupted,
+    onDesign: liveDesign,
+    onUserSpeech: () => setActiveWidget(null),
+    onToolStart: (tool) => {
+      if (tool === "update_design") setActiveWidget(null);
+    },
+    onFlats: (flatsUrl) => {
+      setDesign((prev) => (prev ? { ...prev, flats_url: flatsUrl } : null));
+      setActiveTab("flats");
+      setActiveWidget(null);
+    },
+    onWidget: (widget, occasion, gender) => {
+      setActiveWidget(widget);
+      if (occasion) setPrefilledOccasion(occasion);
+      if (gender === "menswear" || gender === "womenswear") setPrefilledGender(gender);
+    },
+    onRunwayStarted: () => {
+      setActiveTab("runway");
+      setActiveWidget("runway");
+    },
+  });
+  const voiceDesigning = voice.tool === "update_design";
 
   // Mobile shell: on phones the chat and the showcase are two full-height
   // panes behind a segmented switcher (see globals.css, max-width 767px).
@@ -233,9 +259,16 @@ export default function AtelierStudio() {
     setMessages((m) => m.map((x) => (x.live ? { ...x, live: false } : x)));
   }
 
+  // The client spoke over the Couturier: close the cut-short bubble so the next
+  // words start a fresh one instead of being glued onto the interrupted sentence.
+  function liveInterrupted() {
+    setMessages((m) =>
+      m.map((x) => (x.live && x.role === "model" ? { ...x, live: false, interrupted: true } : x)),
+    );
+  }
+
   function liveDesign(d: Design) {
     localStorage.setItem(STORAGE_KEY, d.design_id);
-    setVoiceDesigning(false);
     setDesign(d);
     setAssetErrors({});
     setActiveTab("editorial");
@@ -245,9 +278,16 @@ export default function AtelierStudio() {
   }
 
   async function send(msg: MessageInput) {
+    setActiveWidget(null);
+    // While the live Couturier is on the line, typed words join the same conversation
+    // instead of starting a parallel one over REST.
+    if (voice.active && msg.text) {
+      setMessages((m) => [...m.map((x) => (x.live ? { ...x, live: false } : x)), { role: "user", text: msg.text! }]);
+      voice.sendMessage(msg.text);
+      return;
+    }
     setBusy(true);
     setError(null);
-    setActiveWidget(null);
     if (msg.text) setMessages((m) => [...m, { role: "user", text: msg.text! }]);
     try {
       const d = design ? await api.sendMessage(design.design_id, msg) : await api.createDesign(msg);
@@ -298,7 +338,7 @@ export default function AtelierStudio() {
 
   // Voice mode: tell the live Couturier about something the client did with clicks so it can speak about it.
   function tellVoice(text: string) {
-    if (liveVoiceRef.current?.isActive()) liveVoiceRef.current.sendMessage(text);
+    if (voice.active) voice.sendMessage(text);
   }
 
   async function generateFlats(chosenSize?: string) {
@@ -468,8 +508,8 @@ export default function AtelierStudio() {
       { role: "model", text: ackText },
     ]);
 
-    if (liveVoiceRef.current?.isActive()) {
-      liveVoiceRef.current.sendMessage(
+    if (voice.active) {
+      voice.sendMessage(
         `[ATELIER EVENT]: The VIP client has just uploaded their design reference image ('${file.name}'). ` +
         `Speak 1 short, warm, elegant verbal sentence in your spoken voice acknowledging receipt of their reference and letting them know ` +
         `you are analyzing its lines and beginning to sculpt their bespoke silhouette on the showcase board right now.`
@@ -491,9 +531,9 @@ export default function AtelierStudio() {
             "I have translated your uploaded sketch into an haute couture silhouette capturing its lines, texture, and spirit.",
         },
       ]);
-      if (liveVoiceRef.current?.isActive()) {
-        liveVoiceRef.current.setDesignId(d.design_id);
-        liveVoiceRef.current.sendMessage(
+      if (voice.active) {
+        voice.setDesignId(d.design_id);
+        voice.sendMessage(
           `[ATELIER UPDATE]: The bespoke design inspired by the client's reference has finished draping on the showcase board, along with technical flats and measurements. ` +
           `Speak 1 short, warm spoken sentence informing the client that their bespoke drape and architectural technical flats are ready on the showcase board.`
         );
@@ -531,8 +571,8 @@ export default function AtelierStudio() {
       { role: "model", text: ackText },
     ]);
 
-    if (liveVoiceRef.current?.isActive()) {
-      liveVoiceRef.current.sendMessage(
+    if (voice.active) {
+      voice.sendMessage(
         `[ATELIER EVENT]: The VIP client has specified their upcoming occasion: '${params.occasion}'. ` +
         `Speak 1 short, warm, elegant verbal sentence in your spoken voice acknowledging their event and confirming you are beginning to concoct the ideal bespoke silhouette for them now.`
       );
@@ -559,9 +599,9 @@ export default function AtelierStudio() {
               : `I have curated a bespoke silhouette designed for ${params.occasion}.`),
         },
       ]);
-      if (liveVoiceRef.current?.isActive()) {
-        liveVoiceRef.current.setDesignId(d.design_id);
-        liveVoiceRef.current.sendMessage(
+      if (voice.active) {
+        voice.setDesignId(d.design_id);
+        voice.sendMessage(
           `[ATELIER UPDATE]: The bespoke outfit designed for ${params.occasion} has finished draping on the showcase board. ` +
           `Speak 1 short spoken sentence inviting the client to view the drape and architectural technical flats.`
         );
@@ -1045,52 +1085,13 @@ export default function AtelierStudio() {
         {/* Left Column: Conversational Atelier Stream */}
         <Chat
           messages={messages}
-          busy={busy || voiceDesigning}
+          busy={busy}
           onSend={send}
           hasDesign={Boolean(design)}
           suggestedAction={(design?.suggested_action as AtelierAction) ?? null}
           activeWidget={activeWidget}
           onSelectWidget={setActiveWidget}
-          voiceActive={voiceActive}
-          voiceVolume={voiceVolume}
-          headerAction={
-            <LiveVoice
-              ref={liveVoiceRef}
-              designId={design?.design_id ?? null}
-              onTranscript={liveTranscript}
-              onTurnComplete={liveTurnComplete}
-              onDesign={liveDesign}
-              onError={(err) => {
-                setVoiceDesigning(false);
-                setError(err);
-              }}
-              onUserSpeech={() => {
-                setActiveWidget(null);
-              }}
-              onDesigning={() => {
-                setActiveWidget(null);
-                setVoiceDesigning(true);
-              }}
-              onVoiceActivity={(active, vol) => {
-                setVoiceActive(active);
-                setVoiceVolume(vol);
-              }}
-              onFlats={(flatsUrl) => {
-                setDesign((prev) => (prev ? { ...prev, flats_url: flatsUrl } : null));
-                setActiveTab("flats");
-                setActiveWidget(null);
-              }}
-              onWidget={(widget, occasion, gender) => {
-                setActiveWidget(widget);
-                if (occasion) setPrefilledOccasion(occasion);
-                if (gender === "menswear" || gender === "womenswear") setPrefilledGender(gender);
-              }}
-              onRunwayStarted={() => {
-                setActiveTab("runway");
-                setActiveWidget("runway");
-              }}
-            />
-          }
+          voice={voice}
           widgetContent={
             activeWidget === "design_upload" ? (
               <DesignUploadCard
@@ -1630,6 +1631,9 @@ export default function AtelierStudio() {
       </div>
     )}
       </main>
+
+      {/* Phone: the showcase pane hides the chat, so the live line floats over it */}
+      {voice.active && mobilePane === "showcase" && <VoiceHero voice={voice} variant="floating" />}
 
       <ArchiveDrawer
         isOpen={archiveOpen}

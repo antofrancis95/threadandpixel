@@ -52,7 +52,14 @@ export type AtelierAction =
   | "occasion_stylist"
   | null;
 
-export type ChatMessage = { role: "user" | "model"; text: string; live?: boolean };
+export type ChatMessage = {
+  role: "user" | "model";
+  text: string;
+  /** Still streaming in from the live Couturier. */
+  live?: boolean;
+  /** The client spoke over this sentence before it was finished. */
+  interrupted?: boolean;
+};
 
 export type Job = { job_id: string; status: "running" | "done" | "error"; video_url: string | null; error: string | null };
 

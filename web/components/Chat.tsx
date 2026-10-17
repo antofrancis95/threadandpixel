@@ -2,11 +2,9 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  CameraIcon,
   ClipboardIcon,
   FilmIcon,
   ImageIcon,
-  MannequinIcon,
   MenswearIcon,
   MirrorIcon,
   PartyIcon,
@@ -17,7 +15,8 @@ import {
 } from "@/components/icons";
 import type { MessageInput } from "@/lib/api";
 import type { AtelierAction, ChatMessage } from "@/lib/types";
-import { MicButton } from "./MicButton";
+import type { VoiceController } from "./LiveVoice";
+import { VoiceHero } from "./voice/VoiceHero";
 
 export function Chat({
   messages,
@@ -29,8 +28,7 @@ export function Chat({
   activeWidget,
   onSelectWidget,
   widgetContent,
-  voiceActive = false,
-  voiceVolume = 0,
+  voice,
 }: {
   messages: ChatMessage[];
   busy: boolean;
@@ -41,8 +39,7 @@ export function Chat({
   activeWidget: AtelierAction;
   onSelectWidget: (widget: AtelierAction) => void;
   widgetContent?: ReactNode;
-  voiceActive?: boolean;
-  voiceVolume?: number;
+  voice: VoiceController;
 }) {
   const [text, setText] = useState("");
   const streamRef = useRef<HTMLDivElement>(null);
@@ -64,6 +61,11 @@ export function Chat({
     setText("");
   }
 
+  function say(utterance: string) {
+    onSelectWidget(null);
+    onSend({ text: utterance });
+  }
+
   return (
     <section className="panel chat-panel">
       <div className="panel-head">
@@ -75,70 +77,35 @@ export function Chat({
       </div>
 
       <div className="messages-stream" ref={streamRef}>
-        {messages.length === 0 && (
-          <div className="message-row model">
-            <div className="bubble model">
-              <span className="couturier-badge">
-                <SparkleIcon size={12} style={{ color: "var(--gold)" }} /> Master Couturier
-              </span>
-              <p style={{ margin: 0 }}>
-                Welcome to the Thread &amp; Pixel atelier. What would you like to design today, or do you have a design in mind? You can upload a design sketch to generate an outfit from it, tell me your occasion and share your photo for a bespoke creation, or describe your dream silhouette:
-              </p>
-              <div className="action-chips" style={{ marginTop: "0.85rem", display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="chip-btn highlight"
-                  onClick={() => onSelectWidget("design_upload")}
-                >
-                  <ImageIcon size={13} style={{ color: "var(--gold)" }} />
-                  <span>“Upload Design Image”</span>
-                </button>
-                <button
-                  type="button"
-                  className="chip-btn highlight"
-                  onClick={() => onSelectWidget("occasion_stylist")}
-                >
-                  <PartyIcon size={13} style={{ color: "var(--gold)" }} />
-                  <span>“Design for an Occasion”</span>
-                </button>
-                <button
-                  type="button"
-                  className="chip-btn"
-                  onClick={() => {
-                    onSelectWidget(null);
-                    onSend({ text: "A bespoke midnight navy wool-suiting tuxedo with satin peak lapels for a gentleman." });
-                  }}
-                >
-                  <MannequinIcon size={12} />
-                  <span>“Gentleman's evening tuxedo”</span>
-                </button>
-                <button
-                  type="button"
-                  className="chip-btn"
-                  onClick={() => {
-                    onSelectWidget(null);
-                    onSend({ text: "A pastel blue chiffon maxi dress for an evening gala with sheer flutter sleeves for a lady." });
-                  }}
-                >
-                  <SparkleIcon size={12} />
-                  <span>“Lady's pastel blue gown”</span>
-                </button>
-              </div>
+        {messages.length === 0 && !voice.active && !activeWidget && (
+          <>
+            <VoiceHero voice={voice} variant="hero" onSay={say} />
+            <div className="voice-hero-alt">
+              <span className="voice-examples-label">Or start from</span>
+              <button type="button" className="chip-btn" onClick={() => onSelectWidget("design_upload")}>
+                <ImageIcon size={13} />
+                <span>A sketch or photo</span>
+              </button>
+              <button type="button" className="chip-btn" onClick={() => onSelectWidget("occasion_stylist")}>
+                <PartyIcon size={13} />
+                <span>An occasion</span>
+              </button>
             </div>
-          </div>
+          </>
         )}
 
         {messages.map((m, i) => {
           const isLatestModel = m.role === "model" && i === messages.length - 1;
           return (
             <div key={i} className={`message-row ${m.role}`}>
-              <div className={`bubble ${m.role} ${m.live ? "live-indicator" : ""}`}>
+              <div className={`bubble ${m.role} ${m.live ? "live-indicator" : ""} ${m.interrupted ? "cut" : ""}`}>
                 {m.role === "model" && (
                   <span className="couturier-badge">
                     <SparkleIcon size={12} style={{ color: "var(--gold)" }} /> Master Couturier
                   </span>
                 )}
                 {m.text}
+                {m.interrupted && <span className="bubble-cut" title="You spoke over this"> —</span>}
 
                 {/* Proactive Gender Selection Banner when Couturier prompts for gender in chat */}
                 {isLatestModel && (suggestedAction === "gender" || /gentleman|lady|menswear|womenswear/i.test(m.text)) && (
@@ -371,7 +338,7 @@ export function Chat({
           );
         })}
 
-        {busy && (
+        {busy && !voice.active && (
           <div className="message-row model">
             <div className="bubble model" style={{ fontStyle: "italic", color: "var(--gold-dark)", display: "flex", alignItems: "center", gap: "0.45rem" }}>
               <span className="spin-silk"><SparkleIcon size={13} /></span> Draping silhouette &amp; weaving fabrics…
@@ -387,56 +354,16 @@ export function Chat({
         )}
       </div>
 
-      {voiceActive && (
-        <div className="voice-spectrum-bar" role="status" aria-live="polite">
-          <div className="voice-spectrum-label">
-            <span className="voice-pulse-dot" />
-            <span>Live Voice active · Couturier listening</span>
-          </div>
-          <div className="voice-spectrum-bars" aria-hidden="true">
-            {[0.4, 0.7, 1.0, 0.85, 0.5, 0.95, 0.65, 0.35].map((multiplier, idx) => {
-              const dynamicScale = Math.max(0.18, Math.min(1.0, voiceVolume * multiplier * 1.5 + 0.12));
-              return (
-                <span
-                  key={idx}
-                  className="voice-bar"
-                  style={{
-                    transform: `scaleY(${dynamicScale})`,
-                    opacity: voiceVolume > 0.05 ? 0.95 : 0.45,
-                  }}
-                />
-              );
-            })}
-          </div>
-          <span className="voice-spectrum-hint">Speak naturally</span>
-        </div>
-      )}
+      {(messages.length > 0 || voice.active || activeWidget) && <VoiceHero voice={voice} variant="dock" />}
 
-      <form
-        className={`composer-atelier ${voiceActive ? "voice-active" : ""}`}
-        onSubmit={submit}
-        style={
-          voiceActive
-            ? ({
-                "--voice-vol": voiceVolume,
-              } as React.CSSProperties)
-            : undefined
-        }
-      >
-        <MicButton
-          disabled={busy}
-          onAudio={(audio_b64, audio_mime) => {
-            onSelectWidget(null);
-            onSend({ audio_b64, audio_mime });
-          }}
-        />
+      <form className="composer-atelier" onSubmit={submit}>
         <button
           type="button"
           className={`composer-icon-btn ${activeWidget === "design_upload" ? "active" : ""}`}
           onClick={() => onSelectWidget(activeWidget === "design_upload" ? null : "design_upload")}
           title="Upload a design image or sketch"
           aria-label="Upload a design image"
-          disabled={busy}
+          aria-pressed={activeWidget === "design_upload"}
         >
           <ImageIcon size={17} />
         </button>
@@ -446,7 +373,7 @@ export function Chat({
           onClick={() => onSelectWidget(activeWidget === "occasion_stylist" ? null : "occasion_stylist")}
           title="Design an outfit for your occasion"
           aria-label="Design an outfit for your occasion"
-          disabled={busy}
+          aria-pressed={activeWidget === "occasion_stylist"}
         >
           <PartyIcon size={17} />
         </button>
@@ -454,12 +381,12 @@ export function Chat({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={
-            voiceActive
-              ? "Listening… speak freely to Couturier or refine here..."
-              : "Describe or refine your silhouette (e.g., 'make the sleeves sheer')..."
+            voice.active
+              ? "Type to the Couturier, or just say it…"
+              : "Describe or refine your silhouette, e.g. “make the sleeves sheer”"
           }
           maxLength={2000}
-          disabled={busy}
+          aria-label="Message the Couturier"
         />
         <button type="submit" className="primary composer-send-btn" disabled={busy || !text.trim()} aria-label="Send">
           <SendIcon size={17} className="composer-send-icon" />
