@@ -1,5 +1,6 @@
 import io
 import logging
+import time
 import uuid
 
 from fastapi import HTTPException, status
@@ -44,12 +45,94 @@ def save_turn(ref: firestore.DocumentReference, user_text: str, reply: str) -> N
     batch.commit()
 
 
-def add_version(ref: firestore.DocumentReference, version: int, image: bytes, mime: str, instruction: str) -> str:
+def add_version(
+    ref: firestore.DocumentReference, version: int, image: bytes, mime: str, instruction: str, spec: dict | None = None
+) -> str:
+    """Stores a drape as a numbered version. The spec travels with it so a restore brings the whole design back."""
     path = storage.upload(f"designs/{ref.id}/v{version}.{EXT.get(mime, 'png')}", image, mime)
-    ref.collection("versions").document(str(version)).set(
-        {"image_path": path, "instruction": instruction, "created_at": firestore.SERVER_TIMESTAMP}
-    )
+    doc = {"image_path": path, "instruction": instruction, "created_at": firestore.SERVER_TIMESTAMP}
+    if spec is not None:
+        doc["spec"] = spec
+    ref.collection("versions").document(str(version)).set(doc)
     return path
+
+
+def list_versions_service(user: User, design_id: str) -> list[dict]:
+    """Every version of a design, oldest first, with a viewable image URL."""
+    ref, data = owned_design(design_id, user)
+    current = data.get("current_version", 0)
+    out = []
+    for snap in ref.collection("versions").stream():
+        v = snap.to_dict() or {}
+        try:
+            number = int(snap.id)
+        except ValueError:
+            continue
+        created = v.get("created_at")
+        out.append({
+            "version": number,
+            "image_url": storage.signed_url(v["image_path"]) if v.get("image_path") else None,
+            "instruction": v.get("instruction"),
+            "created_at": created.isoformat() if hasattr(created, "isoformat") else None,
+            "spec": v.get("spec"),
+            "is_current": number == current,
+        })
+    return sorted(out, key=lambda v: v["version"])
+
+
+def restore_version_service(user: User, design_id: str, version: int) -> dict:
+    """Brings an earlier drape back as a new version, so history stays linear and nothing is lost.
+
+    Flats, fitting and runway belong to the drape they were made from, so the restored version starts without
+    them; the spec comes back with the version when it was stored, otherwise the current spec stays.
+    """
+    ref, data = owned_design(design_id, user)
+    snap = ref.collection("versions").document(str(version)).get()
+    if not snap.exists:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Version not found")
+    old = snap.to_dict() or {}
+    if not old.get("image_path"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "That version has no drape to restore.")
+    current = data.get("current_version", 0)
+    if version == current:
+        return design_response(ref.id, data)
+
+    image, mime = storage.download(old["image_path"])
+    new_version = current + 1
+    spec = old.get("spec") or data["spec"]
+    path = add_version(ref, new_version, image, mime, f"Restored from version {version}", spec)
+    user_text = f"Bring back version {version}."
+    reply = f"Version {version} is back on the board as version {new_version}. Flats, fitting and runway will need redoing for it."
+    messages = (data.get("messages") or []) + [{"role": "user", "text": user_text}, {"role": "model", "text": reply}]
+    updates = {
+        "current_version": new_version,
+        "current_image_path": path,
+        "spec": spec,
+        "flats_path": None,
+        "tryon_path": None,
+        "runway_path": None,
+        "suggested_action": "none",
+        "messages": messages,
+        "updated_at": firestore.SERVER_TIMESTAMP,
+    }
+    ref.update(updates)
+    save_turn(ref, user_text, reply)
+    return design_response(ref.id, data | updates, reply, user_text, "none")
+
+
+def latest_quote(ref: firestore.DocumentReference, current_version: int) -> dict | None:
+    """The most recent quote, if it still describes the current version."""
+    try:
+        docs = list(ref.collection("quotes").order_by("created_at", direction=firestore.Query.DESCENDING).limit(1).stream())
+    except Exception as exc:  # a missing index or an offline emulator must not break the design load
+        log.warning("latest quote lookup failed: %s", exc)
+        return None
+    if not docs:
+        return None
+    q = docs[0].to_dict() or {}
+    if q.get("version") != current_version:
+        return None
+    return {"quote_id": docs[0].id, "techpack": q.get("techpack"), "quote": q.get("quote")}
 
 
 def design_response(
@@ -117,7 +200,7 @@ def create_design(user: User, msg: MessageIn, force_sketch: bool = False) -> dic
 
     # Basic specifications are present; proceed to sketch!
     image, mime = demo.image("design-create", lambda: designer.generate(turn.image_prompt))
-    path = add_version(ref, 1, image, mime, turn.image_prompt)
+    path = add_version(ref, 1, image, mime, turn.image_prompt, turn.spec.model_dump())
 
     # If size is available, automatically draft technical flats with measurement callouts!
     effective_size = turn.spec.size or msg.size
@@ -183,7 +266,7 @@ def create_design_from_image(
         "design-create",
         lambda: designer.generate_from_reference(image_bytes, mime, turn.image_prompt),
     )
-    path = add_version(ref, 1, image, out_mime, turn.image_prompt)
+    path = add_version(ref, 1, image, out_mime, turn.image_prompt, turn.spec.model_dump())
 
     effective_size = turn.spec.size or size or "M"
     flats_path = None
@@ -303,7 +386,7 @@ def create_design_for_occasion(
     ]
 
     image, out_mime = demo.image("design-create", lambda: designer.generate(turn.image_prompt))
-    path = add_version(ref, 1, image, out_mime, turn.image_prompt)
+    path = add_version(ref, 1, image, out_mime, turn.image_prompt, turn.spec.model_dump())
 
     # Automatically perform virtual try-on on the person photo
     tryon_path = None
@@ -408,7 +491,7 @@ def continue_design(user: User, design_id: str, msg: MessageIn, force_sketch: bo
         if turn.ready_to_sketch:
             # We now have enough details to sketch!
             image, mime = demo.image("design-create", lambda: designer.generate(turn.image_prompt))
-            path = add_version(ref, 1, image, mime, turn.image_prompt)
+            path = add_version(ref, 1, image, mime, turn.image_prompt, turn.spec.model_dump())
             effective_size = turn.spec.size or msg.size or spec.size
             flats_path = None
             if effective_size:
@@ -477,7 +560,7 @@ def continue_design(user: User, design_id: str, msg: MessageIn, force_sketch: bo
 
         updates |= {
             "current_version": version,
-            "current_image_path": add_version(ref, version, image, out_mime, turn.edit_instruction),
+            "current_image_path": add_version(ref, version, image, out_mime, turn.edit_instruction, turn.spec.model_dump()),
             "flats_path": flats_path,
             "tryon_path": new_tryon_path,
             "runway_path": None,
@@ -591,12 +674,23 @@ def live_context(user: User, design_id: str | None, recent: list | None) -> str:
     return "\n\n".join(parts)
 
 
-def job_response(job_id: str, job: dict) -> dict:
+# How long a runway film usually takes end to end; the client shows progress against it.
+TYPICAL_RUNWAY_SECONDS = 90
+
+
+def job_response(job_id: str, job: dict, minutes: int = 60) -> dict:
+    """The job as the client sees it, with an honest stage and timing instead of a bare spinner."""
+    started = job.get("started_at")
+    status_ = job["status"]
+    stage = job.get("stage") or ("done" if status_ == "done" else "failed" if status_ == "error" else "rendering")
     return {
         "job_id": job_id,
         "design_id": job["design_id"],
-        "status": job["status"],
-        "video_url": storage.signed_url(job["video_path"]) if job.get("video_path") else None,
+        "status": status_,
+        "stage": stage,
+        "elapsed_s": round(time.time() - started, 1) if isinstance(started, (int, float)) else None,
+        "typical_s": TYPICAL_RUNWAY_SECONDS,
+        "video_url": storage.signed_url(job["video_path"], minutes=minutes) if job.get("video_path") else None,
         "error": job.get("error"),
     }
 
@@ -615,6 +709,8 @@ def start_runway_service(user: User, design_id: str) -> dict:
         "design_id": ref.id,
         "version": data["current_version"],
         "status": "running",
+        "stage": "rendering",
+        "started_at": time.time(),
         "operation": None,
         "video_path": None,
         "error": None,
@@ -623,7 +719,7 @@ def start_runway_service(user: User, design_id: str) -> dict:
 
     cached = demo.cached_video() if settings.demo_mode in ("replay", "fallback") else None
     if settings.demo_mode == "replay" and cached:
-        job |= {"status": "done", "video_path": cached}
+        job |= {"status": "done", "stage": "done", "video_path": cached}
     else:
         try:
             if data.get("tryon_path"):
@@ -648,7 +744,7 @@ def start_runway_service(user: User, design_id: str) -> dict:
         except Exception:
             if not cached:
                 raise
-            job |= {"status": "done", "video_path": cached}
+            job |= {"status": "done", "stage": "done", "video_path": cached}
 
     job_ref.set(job)
     if job["video_path"]:

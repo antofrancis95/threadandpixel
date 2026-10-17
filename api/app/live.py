@@ -3,8 +3,9 @@
 Browser <-> this WebSocket <-> Gemini Live. The Live model handles the spoken conversation and calls the
 `update_design` tool, which runs the same Tailor + Nano Banana pipeline as the REST API.
 
-Protocol (client -> server): first a JSON text frame {"type":"start","token":str,"design_id":str|null},
-then binary frames of 16 kHz mono PCM16, optional {"type":"text","text":str}, and {"type":"stop"}.
+Protocol (client -> server): first a JSON text frame {"type":"start","token":str,"design_id":str|null,
+"mode":"vad"|"ptt","history":[...]}, then binary frames of 16 kHz mono PCM16, optional {"type":"text","text":str},
+{"type":"activity_start"} / {"type":"activity_end"} in push-to-talk mode, and {"type":"stop"}.
 Server -> client: binary 24 kHz PCM16 audio, and JSON frames of type
 ready | transcript | turn_complete | interrupted | designing | design | error.
 """
@@ -240,10 +241,16 @@ OPEN_OCCASION_STYLIST = types.FunctionDeclaration(
 )
 
 
-def _live_config(context: str = "") -> types.LiveConnectConfig:
+def _live_config(context: str = "", manual_activity: bool = False) -> types.LiveConnectConfig:
+    """`manual_activity` is push-to-talk: the client marks where speech starts and ends instead of the model's VAD."""
     return types.LiveConnectConfig(
         response_modalities=["AUDIO"],
         system_instruction=f"{SYSTEM_PROMPT}\n\n{context}" if context else SYSTEM_PROMPT,
+        realtime_input_config=(
+            types.RealtimeInputConfig(automatic_activity_detection=types.AutomaticActivityDetection(disabled=True))
+            if manual_activity
+            else None
+        ),
         tools=[
             types.Tool(
                 function_declarations=[
@@ -323,7 +330,10 @@ async def live_session(ws: WebSocket):
             pass
 
     try:
-        async with live_client().aio.live.connect(model=settings.model_live, config=_live_config(context)) as session:
+        manual_activity = start.get("mode") == "ptt"
+        async with live_client().aio.live.connect(
+            model=settings.model_live, config=_live_config(context, manual_activity=manual_activity)
+        ) as session:
             await send({"type": "ready"})
 
             # Prompt the Couturier to greet the VIP client proactively if starting a fresh session
@@ -374,6 +384,15 @@ async def live_session(ws: WebSocket):
                         if data.get("type") == "text" and data.get("text"):
                             try:
                                 await session.send_realtime_input(text=str(data["text"])[:2000])
+                            except (ConnectionClosed, genai_errors.APIError):
+                                return
+                        # Push-to-talk: the client brackets each utterance.
+                        if manual_activity and data.get("type") in ("activity_start", "activity_end"):
+                            try:
+                                if data["type"] == "activity_start":
+                                    await session.send_realtime_input(activity_start=types.ActivityStart())
+                                else:
+                                    await session.send_realtime_input(activity_end=types.ActivityEnd())
                             except (ConnectionClosed, genai_errors.APIError):
                                 return
 

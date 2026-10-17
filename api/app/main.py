@@ -25,7 +25,10 @@ from .service import (
     generate_flats_service,
     history,
     job_response,
+    latest_quote,
+    list_versions_service,
     owned_design,
+    restore_version_service,
     start_runway_service,
 )
 
@@ -184,7 +187,18 @@ def get_design(design_id: str, user: User = Depends(current_user)):
     if not msgs:
         msgs = history(ref, limit=50)
     result["messages"] = msgs
+    result["latest_quote"] = latest_quote(ref, data.get("current_version", 0))
     return result
+
+
+@app.get("/designs/{design_id}/versions")
+def get_versions(design_id: str, user: User = Depends(current_user)):
+    return list_versions_service(user, design_id)
+
+
+@app.post("/designs/{design_id}/versions/{version}/restore")
+def restore_version(design_id: str, version: int, user: User = Depends(current_user)):
+    return restore_version_service(user, design_id, version)
 
 
 @app.post("/designs/{design_id}/messages")
@@ -299,27 +313,20 @@ def get_job(job_id: str, user: User = Depends(current_user)):
     if job["status"] == "running":
         done, video_path, error = runway.poll(job["operation"])
         if done:
+            # The render is done; saving the film is the last, short stage.
+            job_ref.update({"stage": "finishing"})
             if video_path:
-                job |= {"status": "done", "video_path": video_path}
+                job |= {"status": "done", "stage": "done", "video_path": video_path}
                 if settings.demo_mode == "record":
                     demo.save_video(video_path)
             elif settings.demo_mode == "fallback" and (cached := demo.cached_video()):
-                job |= {"status": "done", "video_path": cached}
+                job |= {"status": "done", "stage": "done", "video_path": cached}
             else:
-                job |= {"status": "error", "error": error}
-            job_ref.update({k: job[k] for k in ("status", "video_path", "error")})
+                job |= {"status": "error", "stage": "failed", "error": error}
+            job_ref.update({k: job[k] for k in ("status", "stage", "video_path", "error")})
             if job["video_path"]:
                 db().collection("designs").document(job["design_id"]).update({"runway_path": job["video_path"]})
-    return _job_response(job_id, job)
-
-
-def _job_response(job_id: str, job: dict) -> dict:
-    return {
-        "job_id": job_id,
-        "status": job["status"],
-        "video_url": storage.signed_url(job["video_path"], minutes=60) if job.get("video_path") else None,
-        "error": job.get("error"),
-    }
+    return job_response(job_id, job, minutes=60)
 
 
 @app.post("/designs/{design_id}/techpack")
