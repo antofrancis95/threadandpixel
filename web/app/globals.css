@@ -4011,3 +4011,295 @@ button.composer-icon-btn.active {
     min-width: 100%;
   }
 }
+
+/* =========================================================================
+   Layer 3: jobs in progress, design-change feedback, versions
+   ========================================================================= */
+.job-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  flex-basis: 100%;
+  order: 3;
+}
+
+.job-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 26px;
+  padding: 0 0.7rem;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(197, 168, 128, 0.45);
+  background: var(--gold-light);
+  color: var(--gold-dark);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  animation: fadeSlideUp var(--dur-base) var(--ease) both;
+}
+
+.job-chip-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.job-chip.done {
+  background: var(--emerald-light);
+  border-color: rgba(45, 106, 79, 0.3);
+  color: var(--emerald);
+  cursor: pointer;
+}
+
+.job-chip.done:hover {
+  background: #E2F1E8;
+}
+
+.job-chip.failed {
+  background: var(--rose-light);
+  border-color: rgba(168, 88, 88, 0.3);
+  color: var(--rose);
+}
+
+.job-chip-btn {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  color: inherit;
+}
+
+.job-chip-btn:hover {
+  background: rgba(168, 88, 88, 0.12);
+}
+
+.job-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  background: var(--ivory);
+  border: 1px solid var(--gold-light);
+  color: var(--gold-dark);
+}
+
+.job-progress.failed {
+  background: var(--rose-light);
+  border-color: rgba(168, 88, 88, 0.25);
+  color: var(--rose);
+  flex-wrap: wrap;
+}
+
+.job-progress-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 12rem;
+}
+
+.job-progress-text strong {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.job-progress-text span {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.inline-widget-lede {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.runway-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.2rem;
+  text-align: center;
+  border-radius: var(--radius-md);
+  background: var(--ivory);
+}
+
+.runway-cta p {
+  margin: 0;
+  max-width: 32ch;
+  font-size: 0.82rem;
+  color: var(--ink-secondary);
+}
+
+.runway-preview {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.runway-preview video {
+  width: 100%;
+  display: block;
+}
+
+.runway-preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.6rem;
+}
+
+/* Images that fade between versions instead of snapping */
+.xfade {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Absolutely positioned with auto margins: each layer fits the frame (its max-width
+   and max-height resolve against a definite box) and centres itself. */
+.canvas-frame .xfade-img {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease);
+}
+
+.canvas-frame .xfade-img.is-in {
+  opacity: 1;
+}
+
+/* A chip whose value a request just changed */
+.spec-chip.accent {
+  color: var(--gold-dark);
+  font-weight: 600;
+}
+
+.spec-chip.strong {
+  font-weight: 700;
+}
+
+.spec-chip.changed {
+  animation: specChanged 2.8s var(--ease) both;
+}
+
+@keyframes specChanged {
+  0% {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #FFFFFF;
+    box-shadow: 0 0 0 4px var(--gold-tint);
+    transform: translateY(-1px);
+  }
+  35% {
+    background: var(--gold-light);
+    border-color: var(--gold);
+    color: var(--gold-dark);
+    box-shadow: 0 0 0 0 var(--gold-tint);
+    transform: none;
+  }
+  100% {
+    background: var(--ivory);
+    border-color: var(--line-light);
+    color: inherit;
+  }
+}
+
+/* Versions of the current design seen this session */
+.version-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  flex-shrink: 0;
+  padding-top: 0.5rem;
+}
+
+.version-strip-label {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.version-strip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 0.4rem;
+}
+
+.version-thumb {
+  position: relative;
+  width: 36px;
+  height: 48px;
+  padding: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--ivory);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.version-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.version-thumb:hover {
+  transform: translateY(-1px);
+  border-color: var(--gold);
+}
+
+.version-thumb.active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-tint);
+}
+
+.version-thumb-num {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1px 0;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-align: center;
+  background: rgba(26, 24, 23, 0.65);
+  color: #FAF7F2;
+}
+
+.version-strip-note {
+  font-size: 0.76rem;
+  color: var(--ink-secondary);
+}
+
+.version-strip-back {
+  padding: 0.1rem 0.5rem;
+  margin-left: 0.2rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--gold-dark);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .version-thumb {
+    width: 32px;
+    height: 42px;
+  }
+}

@@ -10,8 +10,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArchiveDrawer } from "@/components/ArchiveDrawer";
 import { Chat } from "@/components/Chat";
+import { CrossfadeImage } from "@/components/CrossfadeImage";
 import { ErrorAlert } from "@/components/ErrorAlert";
+import { JobChips } from "@/components/JobChips";
 import { NextSteps } from "@/components/NextSteps";
+import { SpecRibbon, diffSpec, type SpecKey } from "@/components/SpecRibbon";
+import { VersionStrip, type DesignVersion } from "@/components/VersionStrip";
 import {
   AlertTriangleIcon,
   ArchiveIcon,
@@ -48,6 +52,7 @@ import { OccasionStylistCard } from "@/components/widgets/OccasionStylistCard";
 import { RunwayCard } from "@/components/widgets/RunwayCard";
 import type { MessageInput } from "@/lib/api";
 import { STAGES, nextStep, type Stage, type StepAction } from "@/lib/nextStep";
+import { useStudioJobs, type StudioJob } from "@/lib/useJobs";
 import { useApp } from "@/lib/providers";
 import type {
   AtelierAction,
@@ -56,6 +61,7 @@ import type {
   DesignSummary,
   Measurements,
   QuoteResponse,
+  Spec,
 } from "@/lib/types";
 
 const STORAGE_KEY = "tp.designId";
@@ -98,7 +104,49 @@ export default function AtelierStudio() {
   const [prefilledGender, setPrefilledGender] = useState<"womenswear" | "menswear" | null>(null);
   const [quoteData, setQuoteData] = useState<QuoteResponse | null>(null);
   const [quoteBusy, setQuoteBusy] = useState(false);
-  const [tryonBusy, setTryonBusy] = useState(false);
+
+  // Long-running work is tracked here, not in the cards, so closing a card or switching
+  // designs never loses a film or a fitting. Callbacks may fire after the client moved on.
+  const designRef = useRef<Design | null>(null);
+  designRef.current = design;
+  const studioJobs = useStudioJobs(api, onJobSettled);
+  const runwayJob = studioJobs.jobs.find((j) => j.kind === "runway" && j.designId === design?.design_id) ?? null;
+  const tryonBusy = studioJobs.jobs.some((j) => j.kind === "tryon" && j.status === "running" && j.designId === design?.design_id);
+  const jobRunning = studioJobs.jobs.some((j) => j.status === "running");
+
+  // Design-change feedback: which spec chips a request just changed, and every drape seen this session.
+  const [changedSpec, setChangedSpec] = useState<Set<SpecKey>>(() => new Set());
+  const prevSpecRef = useRef<{ id: string; spec: Spec } | null>(null);
+  const [history, setHistory] = useState<Record<string, DesignVersion[]>>({});
+  const [viewingVersion, setViewingVersion] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!design?.image_url) {
+      prevSpecRef.current = null;
+      return;
+    }
+    const prev = prevSpecRef.current;
+    prevSpecRef.current = { id: design.design_id, spec: design.spec };
+    if (!prev || prev.id !== design.design_id) return;
+    const diff = diffSpec(prev.spec, design.spec);
+    if (diff.size === 0) return;
+    setChangedSpec(diff);
+    const t = window.setTimeout(() => setChangedSpec(new Set()), 2800);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [design?.design_id, design?.version]);
+
+  useEffect(() => {
+    if (!design?.image_url) return;
+    const { design_id, version, image_url } = design;
+    setHistory((h) => {
+      const list = h[design_id] ?? [];
+      if (list.some((v) => v.version === version)) return h;
+      return { ...h, [design_id]: [...list, { version, image_url }].sort((a, b) => a.version - b.version) };
+    });
+    setViewingVersion(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [design?.design_id, design?.version, design?.image_url]);
   const [assetErrors, setAssetErrors] = useState<Record<string, boolean>>({});
 
   // The live Couturier. Callbacks are plain function declarations below (hoisted);
@@ -123,7 +171,11 @@ export default function AtelierStudio() {
       if (occasion) setPrefilledOccasion(occasion);
       if (gender === "menswear" || gender === "womenswear") setPrefilledGender(gender);
     },
-    onRunwayStarted: () => {
+    onRunwayStarted: (job) => {
+      // The live Couturier started the film server-side; follow it here so it lands without a reload.
+      const started = job as { job_id?: string } | null;
+      const id = designRef.current?.design_id;
+      if (started?.job_id && id) studioJobs.adoptRunway(id, started.job_id);
       setActiveTab("runway");
       setActiveWidget("runway");
     },
@@ -425,7 +477,6 @@ export default function AtelierStudio() {
 
   async function handleTryonUpload(file: File) {
     if (!design || tryonBusy) return;
-    setTryonBusy(true);
     setError(null);
     setAssetErrors((e) => ({ ...e, tryon: false }));
     setActiveTab("tryon");
@@ -442,7 +493,9 @@ export default function AtelierStudio() {
     );
     try {
       const { upload_id } = await api.uploadPerson(file);
-      const { tryon_url } = await api.tryOn(design.design_id, upload_id);
+      const tryon_url = await studioJobs.track("tryon", design.design_id, () =>
+        api.tryOn(design.design_id, upload_id).then((r) => r.tryon_url),
+      );
       setDesign({ ...design, tryon_url, runway_url: null, has_vto_portrait: true });
       setActiveTab("tryon");
       setActiveWidget(null);
@@ -463,14 +516,11 @@ export default function AtelierStudio() {
         `[ATELIER UPDATE]: The virtual fitting failed (${(e as Error).message}) and nothing new is on the showcase board. Do NOT say it is ready. ` +
           `Speak 1 short sentence apologising and inviting the client to upload a clear, full-length, front-facing portrait to try again.`,
       );
-    } finally {
-      setTryonBusy(false);
     }
   }
 
   async function handleDrapeExisting() {
     if (!design || tryonBusy) return;
-    setTryonBusy(true);
     setError(null);
     setAssetErrors((e) => ({ ...e, tryon: false }));
     setActiveTab("tryon");
@@ -479,7 +529,9 @@ export default function AtelierStudio() {
         `Speak 1 short, warm sentence telling them you are draping it in the salon mirror now.`,
     );
     try {
-      const { tryon_url } = await api.tryOn(design.design_id);
+      const tryon_url = await studioJobs.track("tryon", design.design_id, () =>
+        api.tryOn(design.design_id).then((r) => r.tryon_url),
+      );
       setDesign({ ...design, tryon_url, runway_url: null, has_vto_portrait: true });
       setActiveTab("tryon");
       setActiveWidget(null);
@@ -500,8 +552,6 @@ export default function AtelierStudio() {
         `[ATELIER UPDATE]: The virtual fitting failed and nothing new is on the showcase board. Do NOT say it is ready. ` +
           `Speak 1 short sentence apologising and offering to try again.`,
       );
-    } finally {
-      setTryonBusy(false);
     }
   }
 
@@ -672,8 +722,28 @@ export default function AtelierStudio() {
     if (tab) runStep({ kind: "tab", tab });
   }
 
+  // A film or fitting finished, possibly after the client moved on to another design.
+  function onJobSettled(job: StudioJob) {
+    if (job.kind !== "runway") return;
+    if (job.status === "done" && job.resultUrl) {
+      const url = job.resultUrl;
+      setDesign((d) => (d && d.design_id === job.designId ? { ...d, runway_url: url } : d));
+      setAssetErrors((e) => ({ ...e, runway: false }));
+      tellVoice(
+        `[ATELIER UPDATE]: The runway film is ready on the Runway tab of the showcase board. ` +
+          `Speak 1 short, warm sentence inviting the client to watch it.`,
+      );
+    } else if (job.status === "error") {
+      tellVoice(
+        `[ATELIER UPDATE]: The runway film failed (${job.error}) and nothing new is on the showcase board. Do NOT say it is ready. ` +
+          `Speak 1 short sentence apologising and offering to try again.`,
+      );
+    }
+  }
+
   function startOver() {
     localStorage.removeItem(STORAGE_KEY);
+    setViewingVersion(null);
     setDesign(null);
     setMessages([]);
     setQuoteData(null);
@@ -1100,7 +1170,7 @@ export default function AtelierStudio() {
         >
           <ChatIcon size={15} />
           <span>Couturier</span>
-          {(busy || voiceDesigning) && mobilePane !== "chat" && <span className="mobile-pane-dot busy" aria-hidden="true" />}
+          {(busy || voiceDesigning || jobRunning) && mobilePane !== "chat" && <span className="mobile-pane-dot busy" aria-hidden="true" />}
         </button>
         <button
           type="button"
@@ -1186,10 +1256,10 @@ export default function AtelierStudio() {
               />
             ) : activeWidget === "runway" && design ? (
               <RunwayCard
-                designId={design.design_id}
                 runwayUrl={design.runway_url}
-                onResult={(url) => {
-                  setDesign({ ...design, runway_url: url });
+                job={runwayJob}
+                onStart={() => {
+                  void studioJobs.startRunway(design.design_id);
                   setActiveTab("runway");
                 }}
                 onClose={() => setActiveWidget(null)}
@@ -1228,6 +1298,18 @@ export default function AtelierStudio() {
                 </span>
               )}
             </h2>
+            <JobChips
+              jobs={studioJobs.jobs}
+              onOpen={(job) => {
+                setActiveTab(job.kind === "runway" ? "runway" : "tryon");
+                setMobilePane("showcase");
+              }}
+              onRetry={(job) => {
+                if (job.kind === "runway") void studioJobs.startRunway(job.designId);
+                else setActiveWidget("fitting");
+              }}
+              onDismiss={studioJobs.dismiss}
+            />
             <div className="view-tabs">
               <button
                 type="button"
@@ -1442,7 +1524,7 @@ export default function AtelierStudio() {
                       <span className="shimmer-subtitle">Fitting the garment to your portrait. This takes a moment…</span>
                     </div>
                   ) : design.tryon_url ? (
-                    <img
+                    <CrossfadeImage
                       src={design.tryon_url}
                       alt="Virtual try-on drape"
                       onError={() => setAssetErrors((e) => ({ ...e, tryon: true }))}
@@ -1486,7 +1568,17 @@ export default function AtelierStudio() {
                     </div>
                   )
                 ) : activeTab === "runway" ? (
-                  design.runway_url ? (
+                  runwayJob?.status === "running" && !design.runway_url ? (
+                    <div className="silk-shimmer-full" role="status" aria-live="polite">
+                      <div className="shimmer-aura">
+                        <span className="shimmer-icon">
+                          <FilmIcon size={24} />
+                        </span>
+                      </div>
+                      <h3 className="shimmer-title">Filming the runway</h3>
+                      <span className="shimmer-subtitle">Usually one to two minutes. Keep designing; the film will appear here.</span>
+                    </div>
+                  ) : design.runway_url ? (
                     <video
                       src={design.runway_url}
                       controls
@@ -1517,8 +1609,12 @@ export default function AtelierStudio() {
                     </div>
                   )
                 ) : (
-                  <img
-                    src={design.image_url}
+                  <CrossfadeImage
+                    src={
+                      (viewingVersion !== null &&
+                        history[design.design_id]?.find((v) => v.version === viewingVersion)?.image_url) ||
+                      design.image_url
+                    }
                     alt="High-resolution couture garment render"
                     onError={() => setAssetErrors((e) => ({ ...e, editorial: true }))}
                   />
@@ -1544,62 +1640,26 @@ export default function AtelierStudio() {
             )}
           </div>
 
+          {design && activeTab === "editorial" && (
+            <VersionStrip
+              versions={history[design.design_id] ?? []}
+              current={design.version}
+              viewing={viewingVersion}
+              onView={setViewingVersion}
+            />
+          )}
+
           <NextSteps step={step} voiceActive={voice.active} onAction={runStep} onJump={jumpToStage} />
 
           {/* Garment Details & Spec Ribbon */}
           {design && design.version > 0 && (
             <>
-              <div className="spec-ribbon">
-                <span className="spec-chip">
-                  <span className="swatch-circle" style={{ background: design.spec.color_hex }} />
-                  {design.spec.color_hex}
-                </span>
-                {design.occasion && (
-                  <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 600 }}>
-                    <PartyIcon size={11} /> {design.occasion}
-                  </span>
-                )}
-                {design.reference_image_url && (
-                  <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 600 }}>
-                    <ImageIcon size={11} /> Reference-Inspired
-                  </span>
-                )}
-                {design.spec.gender && (
-                  <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
-                    {design.spec.gender === "menswear" ? (
-                      <>
-                        <MenswearIcon size={12} />
-                        <span>Menswear</span>
-                      </>
-                    ) : (
-                      <>
-                        <WomenswearIcon size={12} />
-                        <span>Womenswear</span>
-                      </>
-                    )}
-                  </span>
-                )}
-                {design.spec.size && (
-                  <span className="spec-chip" style={{ color: "var(--gold-dark)", fontWeight: 700 }}>
-                    Size {design.spec.size}
-                  </span>
-                )}
-                {design.spec.fit && (
-                  <span className="spec-chip">
-                    {design.spec.fit}
-                  </span>
-                )}
-                <span className="spec-chip">{design.spec.garment_type}</span>
-                <span className="spec-chip">{design.spec.length}</span>
-                <span className="spec-chip">{design.spec.sleeve.replace("_", " ")} sleeve</span>
-                <span className="spec-chip">fabric: {design.spec.fabric_id}</span>
-                {design.spec.lining && <span className="spec-chip">silk lining</span>}
-                {design.spec.embellishments.map((e) => (
-                  <span key={e} className="spec-chip">
-                    <SparkleIcon size={10} style={{ color: "var(--gold)" }} /> {e}
-                  </span>
-                ))}
-              </div>
+              <SpecRibbon
+                spec={design.spec}
+                occasion={design.occasion}
+                referenced={Boolean(design.reference_image_url)}
+                changed={changedSpec}
+              />
 
               {/* Quick Atelier Actions Toolbar */}
               <div className="showcase-actions">
