@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useApp } from "@/lib/providers";
-import type { AtelierAction, Design } from "@/lib/types";
+import type { AtelierAction, Design, QuoteResponse } from "@/lib/types";
 
 // Captures mic audio as 16 kHz mono PCM16 in ~100 ms chunks.
 const CAPTURE_WORKLET = `
@@ -52,6 +52,7 @@ export type VoiceTool =
   | "draft_flats"
   | "open_fitting"
   | "generate_runway"
+  | "get_quote"
   | "open_design_upload"
   | "open_occasion_stylist";
 
@@ -106,6 +107,9 @@ export interface LiveVoiceOptions {
   onFlats?: (flatsUrl: string) => void;
   onWidget?: (widget: AtelierAction, occasion?: string, gender?: string) => void;
   onRunwayStarted?: (job: unknown) => void;
+  onQuote?: (quote: QuoteResponse) => void;
+  /** Recent conversation, sent on connect so a re-established line resumes instead of starting cold. */
+  getHistory?: () => { role: "user" | "model"; text: string }[];
   onToolStart?: (tool: VoiceTool) => void;
   onUserSpeech?: () => void;
 }
@@ -119,6 +123,7 @@ type ServerEvent =
   | { type: "flats"; flats_url: string }
   | { type: "widget"; widget: AtelierAction; occasion?: string; gender?: string }
   | { type: "runway_started"; job: unknown }
+  | { type: "quote"; quote: QuoteResponse }
   | { type: "error"; message: string };
 
 const KNOWN_TOOLS: VoiceTool[] = [
@@ -126,6 +131,7 @@ const KNOWN_TOOLS: VoiceTool[] = [
   "draft_flats",
   "open_fitting",
   "generate_runway",
+  "get_quote",
   "open_design_upload",
   "open_occasion_stylist",
 ];
@@ -365,7 +371,15 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
 
     const setTool = (tool: VoiceTool | null) => patch({ tool });
 
-    ws.onopen = () => ws.send(JSON.stringify({ type: "start", token, design_id: opts.current.designId }));
+    ws.onopen = () =>
+      ws.send(
+        JSON.stringify({
+          type: "start",
+          token,
+          design_id: opts.current.designId,
+          history: opts.current.getHistory?.().slice(-30),
+        }),
+      );
     ws.onerror = () => {
       if (stopped) return;
       patch({ error: { kind: "connection", message: "The salon could not be reached. Check your connection and try again." } });
@@ -465,6 +479,10 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
         case "widget":
           setTool(null);
           opts.current.onWidget?.(msg.widget, msg.occasion, msg.gender);
+          break;
+        case "quote":
+          setTool(null);
+          opts.current.onQuote?.(msg.quote);
           break;
         case "runway_started":
           setTool(null);

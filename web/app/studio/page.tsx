@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArchiveDrawer } from "@/components/ArchiveDrawer";
 import { Chat } from "@/components/Chat";
 import { ErrorAlert } from "@/components/ErrorAlert";
+import { NextSteps } from "@/components/NextSteps";
 import {
   AlertTriangleIcon,
   ArchiveIcon,
@@ -46,6 +47,7 @@ import { MeasurementCard } from "@/components/widgets/MeasurementCard";
 import { OccasionStylistCard } from "@/components/widgets/OccasionStylistCard";
 import { RunwayCard } from "@/components/widgets/RunwayCard";
 import type { MessageInput } from "@/lib/api";
+import { STAGES, nextStep, type Stage, type StepAction } from "@/lib/nextStep";
 import { useApp } from "@/lib/providers";
 import type {
   AtelierAction,
@@ -65,6 +67,9 @@ export default function AtelierStudio() {
   const { auth, api, user, ready } = useApp();
   const [design, setDesign] = useState<Design | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Read by the voice hook on (re)connect so the Couturier remembers what was already said.
+  const messagesRef = useRef<ChatMessage[]>([]);
+  messagesRef.current = messages;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [demoMode, setDemoMode] = useState<string>("off");
@@ -122,8 +127,19 @@ export default function AtelierStudio() {
       setActiveTab("runway");
       setActiveWidget("runway");
     },
+    onQuote: (quote) => {
+      setQuoteData(quote);
+      setActiveWidget("commission");
+    },
+    getHistory: () => messagesRef.current.filter((m) => m.text.trim()).map((m) => ({ role: m.role, text: m.text })),
   });
   const voiceDesigning = voice.tool === "update_design";
+
+  // Where the commission stands and what to say next; drives the rail and the chat chips.
+  const step = nextStep(design, {
+    hasQuote: Boolean(quoteData),
+    suggestedAction: (design?.suggested_action as AtelierAction) ?? null,
+  });
 
   // Mobile shell: on phones the chat and the showcase are two full-height
   // panes behind a segmented switcher (see globals.css, max-width 767px).
@@ -618,6 +634,44 @@ export default function AtelierStudio() {
     }
   }
 
+  // One place turns a next-step into something that happens: a sentence to the Couturier,
+  // a card, a tab, or the flats. Chips, the rail and the toolbar all go through here.
+  function runStep(action: StepAction) {
+    switch (action.kind) {
+      case "say":
+        send({ text: action.text });
+        break;
+      case "widget":
+        setActiveWidget(activeWidget === action.widget ? null : action.widget);
+        break;
+      case "flats":
+        setActiveTab("flats");
+        setMobilePane("showcase");
+        if (design && !design.flats_url && action.size) generateFlats(action.size);
+        break;
+      case "tab":
+        setActiveTab(action.tab);
+        setMobilePane("showcase");
+        break;
+      case "techpack":
+        // Ask for the size (and tape) before pricing anything; the card drafts flats and quote together.
+        setActiveWidget(quoteData ? "commission" : "measurements");
+        break;
+      case "talk":
+        voice.start();
+        break;
+    }
+  }
+
+  function jumpToStage(stage: Stage) {
+    if (stage === "techpack") {
+      setActiveWidget(quoteData ? "commission" : "measurements");
+      return;
+    }
+    const tab = STAGES.find((s) => s.id === stage)?.tab;
+    if (tab) runStep({ kind: "tab", tab });
+  }
+
   function startOver() {
     localStorage.removeItem(STORAGE_KEY);
     setDesign(null);
@@ -1087,11 +1141,12 @@ export default function AtelierStudio() {
           messages={messages}
           busy={busy}
           onSend={send}
-          hasDesign={Boolean(design)}
-          suggestedAction={(design?.suggested_action as AtelierAction) ?? null}
           activeWidget={activeWidget}
           onSelectWidget={setActiveWidget}
           voice={voice}
+          chips={step.chips}
+          onChip={runStep}
+          dockHint={design && step.stage ? `Next: say “${step.say}”` : undefined}
           widgetContent={
             activeWidget === "design_upload" ? (
               <DesignUploadCard
@@ -1189,12 +1244,7 @@ export default function AtelierStudio() {
               >
                 <RulerIcon size={12} />
                 <span>Flats</span>
-                {design && design.flats_url && (
-                  <span className="tab-pill" style={{ background: "var(--gold)", color: "white", fontWeight: 600 }}>
-                    with measurements
-                  </span>
-                )}
-                {design && !design.flats_url && design.version > 0 && <span className="tab-pill">draft</span>}
+                {design?.flats_url && <span className="tab-pill ready">{design.spec.size ? `size ${design.spec.size}` : "ready"}</span>}
               </button>
               <button
                 type="button"
@@ -1203,7 +1253,7 @@ export default function AtelierStudio() {
               >
                 <MirrorIcon size={12} />
                 <span>Fitting</span>
-                {design && !design.tryon_url && <span className="tab-pill">try-on</span>}
+                {design?.tryon_url && <span className="tab-pill ready">ready</span>}
               </button>
               <button
                 type="button"
@@ -1212,7 +1262,7 @@ export default function AtelierStudio() {
               >
                 <FilmIcon size={12} />
                 <span>Runway</span>
-                {design && !design.runway_url && <span className="tab-pill">veo</span>}
+                {design?.runway_url && <span className="tab-pill ready">ready</span>}
               </button>
             </div>
           </div>
@@ -1494,6 +1544,8 @@ export default function AtelierStudio() {
             )}
           </div>
 
+          <NextSteps step={step} voiceActive={voice.active} onAction={runStep} onJump={jumpToStage} />
+
           {/* Garment Details & Spec Ribbon */}
           {design && design.version > 0 && (
             <>
@@ -1558,7 +1610,7 @@ export default function AtelierStudio() {
                   title="Upload a design or sketch"
                 >
                   <ImageIcon size={14} />
-                  <span>Upload Design</span>
+                  <span>Upload a sketch</span>
                 </button>
                 <button
                   type="button"
@@ -1567,7 +1619,7 @@ export default function AtelierStudio() {
                   title="Design for an occasion and photo"
                 >
                   <PartyIcon size={14} />
-                  <span>Occasion Stylist</span>
+                  <span>Occasion stylist</span>
                 </button>
                 <button
                   type="button"
@@ -1575,7 +1627,7 @@ export default function AtelierStudio() {
                   onClick={() => setActiveWidget(activeWidget === "measurements" ? null : "measurements")}
                 >
                   <ScissorsIcon size={14} />
-                  <span>Measure &amp; Fit</span>
+                  <span>Measurements</span>
                 </button>
                 <button
                   type="button"
@@ -1583,7 +1635,7 @@ export default function AtelierStudio() {
                   onClick={() => setActiveWidget(activeWidget === "fitting" ? null : "fitting")}
                 >
                   <MirrorIcon size={14} />
-                  <span>Try On Mirror</span>
+                  <span>Fitting room</span>
                 </button>
                 <button
                   type="button"
@@ -1597,7 +1649,7 @@ export default function AtelierStudio() {
                   disabled={busy}
                 >
                   <RulerIcon size={14} />
-                  <span>{design.flats_url ? "View Flats" : "Draft Flats"}</span>
+                  <span>{design.flats_url ? "View flats" : "Draft flats"}</span>
                 </button>
                 <button
                   type="button"
@@ -1608,21 +1660,15 @@ export default function AtelierStudio() {
                   }}
                 >
                   <FilmIcon size={14} />
-                  <span>Film Runway</span>
+                  <span>Film runway</span>
                 </button>
                 <button
                   type="button"
                   className={`showcase-action-btn ${activeWidget === "commission" ? "active" : ""}`}
-                  onClick={() => {
-                    if (quoteData) {
-                      setActiveWidget("commission");
-                    } else {
-                      handleApplyMeasurements("M");
-                    }
-                  }}
+                  onClick={() => runStep({ kind: "techpack" })}
                 >
                   <ClipboardIcon size={14} />
-                  <span>Tech Pack</span>
+                  <span>Tech pack</span>
                 </button>
               </div>
             </>

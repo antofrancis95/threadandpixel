@@ -3315,6 +3315,10 @@ button.composer-icon-btn.active {
   stroke-dasharray: 2 6;
 }
 
+.voice-thread-siri {
+  display: block;
+}
+
 /* Bars: the landing page's waveform, coloured by the same states */
 .voice-thread-bar {
   fill: var(--gold);
@@ -3793,5 +3797,217 @@ button.composer-icon-btn.active {
   .canvas-frame:hover img,
   .canvas-frame:hover .flats-view > img {
     transform: none;
+  }
+}
+
+/* =========================================================================
+   Next steps: the commission rail and sentence chips
+   ========================================================================= */
+.next-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  flex-shrink: 0;
+  padding: 0.75rem 0.25rem 0.25rem;
+  border-top: 1px solid var(--line-light);
+}
+
+.next-steps-track {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.next-step {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* The thread between stops */
+.next-step + .next-step::before {
+  content: "";
+  flex: 1;
+  height: 1px;
+  margin: 0 0.35rem;
+  background: var(--line);
+  transition: background var(--dur-base) var(--ease);
+}
+
+.next-step.done + .next-step::before,
+.next-step.current + .next-step.done::before {
+  background: var(--gold);
+}
+
+.next-step-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.4rem 0.2rem 0.2rem;
+  border-radius: var(--radius-full);
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+
+.next-step-btn:hover:not(:disabled) {
+  background: var(--gold-light);
+  color: var(--ink);
+}
+
+.next-step-btn:disabled {
+  opacity: 0.6;
+}
+
+.next-step-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  transition:
+    background var(--dur-base) var(--ease),
+    border-color var(--dur-base) var(--ease),
+    color var(--dur-base) var(--ease),
+    box-shadow var(--dur-base) var(--ease);
+}
+
+.next-step.done .next-step-dot {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #FAF7F2;
+}
+
+.next-step.done .next-step-btn {
+  color: var(--ink-secondary);
+}
+
+.next-step.current .next-step-dot {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #FFFFFF;
+  box-shadow: 0 0 0 4px var(--gold-tint);
+}
+
+.next-step.current .next-step-btn {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.next-steps-cta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+}
+
+.next-steps-sentence {
+  flex: 1;
+  min-width: 14rem;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.86rem;
+  color: var(--ink);
+}
+
+.next-steps-kicker {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold-dark);
+}
+
+.next-steps-btn {
+  height: 34px;
+  padding: 0 0.9rem;
+  gap: 0.15rem;
+  border-radius: var(--radius-full);
+  background: var(--ink);
+  color: #FAF7F2;
+  border: 1px solid var(--ink);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.92rem;
+  letter-spacing: 0.005em;
+  transition:
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.next-steps-btn:hover:not(:disabled) {
+  background: #2D2926;
+  box-shadow: var(--shadow-gold);
+  transform: translateY(-1px);
+}
+
+.next-steps-btn svg {
+  margin-right: 0.35rem;
+}
+
+.next-steps-quote {
+  color: var(--gold);
+  font-style: normal;
+}
+
+.next-steps-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Sentence chips in the chat: something you could say out loud */
+.chip-btn.say-chip {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.9rem;
+  letter-spacing: 0.005em;
+}
+
+.chip-btn.say-chip > span[aria-hidden] {
+  color: var(--gold);
+  font-style: normal;
+}
+
+.tab-pill.ready {
+  background: var(--gold);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .next-step-label {
+    display: none;
+  }
+  .next-step.current .next-step-label {
+    display: inline;
+  }
+  .next-step + .next-step::before {
+    margin: 0 0.2rem;
+  }
+  .next-steps-hint {
+    display: none;
+  }
+  .next-steps-sentence {
+    min-width: 100%;
   }
 }

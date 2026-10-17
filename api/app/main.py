@@ -20,6 +20,7 @@ from .service import (
     create_design,
     create_design_for_occasion,
     create_design_from_image,
+    create_techpack_service,
     design_response,
     generate_flats_service,
     history,
@@ -323,22 +324,8 @@ def _job_response(job_id: str, job: dict) -> dict:
 
 @app.post("/designs/{design_id}/techpack")
 def create_techpack(design_id: str, body: TechPackIn, user: User = Depends(current_user)):
-    ref, data = owned_design(design_id, user)
-    spec = DesignSpec.model_validate(data["spec"])
-    image, mime = storage.download(data["current_image_path"])
-    critique = demo.model("techpack", lambda: techpack.analyze(image, mime, spec), TechPackCritique)
-    quote = pricing.quote(spec, body.size)
-
-    quote_ref = ref.collection("quotes").document()
-    quote_ref.set({
-        "version": data["current_version"],
-        "size": body.size,
-        "measurements": body.measurements.model_dump() if body.measurements else None,
-        "techpack": critique.model_dump(),
-        "quote": quote,
-        "created_at": firestore.SERVER_TIMESTAMP,
-    })
-    return {"quote_id": quote_ref.id, "techpack": critique.model_dump(), "quote": quote}
+    measurements = body.measurements.model_dump() if body.measurements else None
+    return create_techpack_service(user, design_id, body.size, measurements)
 
 
 @app.post("/designs/{design_id}/order")

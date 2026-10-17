@@ -9,6 +9,7 @@ export const TOOL_LABELS: Record<VoiceTool, string> = {
   draft_flats: "Drafting the technical flats",
   open_fitting: "Opening the fitting room",
   generate_runway: "Directing the runway film",
+  get_quote: "Preparing your estimate",
   open_design_upload: "Opening the upload card",
   open_occasion_stylist: "Opening the occasion stylist",
 };
@@ -22,7 +23,7 @@ export const EXAMPLE_UTTERANCES = [
 type StatusCopy = { primary: string; secondary?: string };
 
 /** One sentence per state, so the client always knows what the Couturier is doing. */
-export function voiceStatus(v: VoiceController, compact = false): StatusCopy {
+export function voiceStatus(v: VoiceController, compact = false, hint?: string): StatusCopy {
   const toolLine = v.tool ? (compact ? `${TOOL_LABELS[v.tool]}…` : `${TOOL_LABELS[v.tool]}… you can keep talking`) : undefined;
   switch (v.phase) {
     case "idle":
@@ -30,7 +31,7 @@ export function voiceStatus(v: VoiceController, compact = false): StatusCopy {
         return { primary: "Talk live", secondary: "Your browser is blocking the microphone for this site." };
       }
       return compact
-        ? { primary: "Talk live", secondary: "Hands-free. Say what to change and the Couturier does it." }
+        ? { primary: "Talk live", secondary: hint ?? "Hands-free. Say what to change and the Couturier does it." }
         : { primary: "Tap the mic and describe the piece you have in mind." };
     case "connecting":
       return { primary: "Opening the salon…" };
@@ -138,14 +139,17 @@ export function VoiceHero({
   voice,
   variant,
   onSay,
+  hint,
 }: {
   voice: VoiceController;
   variant: "hero" | "dock" | "floating";
+  /** Dock, idle: what the client could do next. */
+  hint?: string;
   /** The client picked an example sentence; send it as if typed. */
   onSay?: (text: string) => void;
 }) {
   const ended = voice.phase === "error" || voice.phase === "dropped";
-  const status = voiceStatus(voice, variant !== "hero");
+  const status = voiceStatus(voice, variant !== "hero", hint);
 
   if (variant === "hero") {
     return (
@@ -157,7 +161,7 @@ export function VoiceHero({
 
         <div className="voice-stage">
           <MicButton voice={voice} size="lg" />
-          <VoiceThread phase={voice.phase} tool={voice.tool} muted={voice.muted} levels={voice.levels} shape="bars" size={164} barHeight={40} />
+          <VoiceThread phase={voice.phase} tool={voice.tool} muted={voice.muted} levels={voice.levels} shape="siri" size={240} barHeight={64} />
         </div>
 
         <div className="voice-status">
@@ -224,7 +228,7 @@ export function VoiceHero({
             </p>
             <Captions voice={voice} compact />
           </div>
-          <VoiceThread phase={voice.phase} tool={voice.tool} muted={voice.muted} levels={voice.levels} shape="bars" size={116} />
+          <VoiceThread phase={voice.phase} tool={voice.tool} muted={voice.muted} levels={voice.levels} shape="siri" size={132} barHeight={40} />
           <button type="button" className="voice-ctl end" onClick={voice.stop} aria-label="End the conversation" title="End the conversation">
             <CloseIcon size={13} />
             <span>End</span>
