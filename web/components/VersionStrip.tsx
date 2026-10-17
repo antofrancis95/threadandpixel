@@ -1,6 +1,14 @@
 "use client";
 
-export type DesignVersion = { version: number; image_url: string; note?: string };
+/** Everything a version had on the board when it was current. */
+export type DesignVersion = {
+  version: number;
+  image_url: string;
+  flats_url: string | null;
+  tryon_url: string | null;
+  runway_url: string | null;
+  note?: string;
+};
 
 /**
  * Every drape this session has seen of the current design, oldest first.
@@ -21,7 +29,6 @@ export function VersionStrip({
   if (versions.length < 2) return null;
   return (
     <div className="version-strip" role="group" aria-label="Versions of this design">
-      <span className="version-strip-label">Versions</span>
       <ol className="version-strip-list">
         {versions.map((v) => {
           const active = viewing === null ? v.version === current : v.version === viewing;
@@ -33,7 +40,7 @@ export function VersionStrip({
                 onClick={() => onView(v.version === current ? null : v.version)}
                 aria-pressed={active}
                 aria-label={`Version ${v.version}${v.version === current ? ", current" : ""}`}
-                title={v.note ?? `Version ${v.version}`}
+                title={`Version ${v.version}${[v.flats_url && "flats", v.tryon_url && "fitting", v.runway_url && "runway"].filter(Boolean).length ? ` · ${[v.flats_url && "flats", v.tryon_url && "fitting", v.runway_url && "runway"].filter(Boolean).join(", ")}` : ""}`}
               >
                 <img src={v.image_url} alt="" />
                 <span className="version-thumb-num">v{v.version}</span>
@@ -43,8 +50,8 @@ export function VersionStrip({
         })}
       </ol>
       {viewing !== null && viewing !== current && (
-        <span className="version-strip-note">
-          Looking at v{viewing}. The current design is v{current}.{" "}
+        <span className="version-strip-note" role="status">
+          Looking at v{viewing} of v{current}.
           <button type="button" className="version-strip-back" onClick={() => onView(null)}>
             Back to current
           </button>

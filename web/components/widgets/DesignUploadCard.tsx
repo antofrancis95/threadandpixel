@@ -45,7 +45,7 @@ export function DesignUploadCard({
         )}
       </div>
 
-      <p style={{ fontSize: "0.82rem", color: "var(--muted)", margin: "0 0 0.85rem", lineHeight: 1.45 }}>
+      <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", margin: "0 0 0.85rem", lineHeight: 1.45 }}>
         Upload a sketch, garment reference photo, or design concept. The Master Couturier will analyze its silhouette and lines, curate certified atelier fabrics, and sculpt your outfit based on it:
       </p>
 
@@ -66,8 +66,8 @@ export function DesignUploadCard({
               style={{ width: "65px", height: "85px", objectFit: "cover", borderRadius: "6px", border: "1px solid var(--gold)" }}
             />
             <div style={{ textAlign: "left" }}>
-              <strong style={{ fontSize: "0.86rem", display: "block", color: "var(--ink)" }}>{file?.name}</strong>
-              <span style={{ fontSize: "0.75rem", color: "var(--gold-dark)" }}>✦ Design image loaded · Tap to replace</span>
+              <strong style={{ fontSize: "var(--text-sm)", display: "block", color: "var(--ink)" }}>{file?.name}</strong>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--gold-dark)" }}>✦ Design image loaded · Tap to replace</span>
             </div>
           </div>
         ) : (
@@ -75,10 +75,10 @@ export function DesignUploadCard({
             <div className="dropzone-icon">
               <CameraIcon size={32} style={{ color: "var(--gold)" }} />
             </div>
-            <strong style={{ fontSize: "0.88rem", display: "block", color: "var(--ink)" }}>
+            <strong style={{ fontSize: "var(--text-base)", display: "block", color: "var(--ink)" }}>
               Upload your design sketch or photo
             </strong>
-            <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
               JPEG, PNG or WebP · Hand sketches, runway concepts, or fashion photos
             </span>
           </div>
@@ -87,7 +87,7 @@ export function DesignUploadCard({
 
       {/* Target Tailoring Silhouette */}
       <div style={{ marginBottom: "0.85rem" }}>
-        <label style={{ fontSize: "0.78rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.4rem" }}>
+        <label style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.4rem" }}>
           Tailoring Silhouette
         </label>
         <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
@@ -126,10 +126,10 @@ export function DesignUploadCard({
       {/* Size Selection */}
       <div style={{ marginBottom: "0.85rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.35rem" }}>
-          <label style={{ fontSize: "0.78rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+          <label style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
             Proportion Size (Flats &amp; Measurements)
           </label>
-          <span style={{ fontSize: "0.75rem", color: "var(--gold-dark)", fontWeight: 500 }}>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--gold-dark)", fontWeight: 500 }}>
             Includes 2D technical specs
           </span>
         </div>
@@ -150,7 +150,7 @@ export function DesignUploadCard({
 
       {/* Optional Design Notes */}
       <div style={{ marginBottom: "1rem" }}>
-        <label htmlFor="design-notes-input" style={{ fontSize: "0.78rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
+        <label htmlFor="design-notes-input" style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
           Bespoke Customization Notes (Optional)
         </label>
         <textarea
@@ -164,14 +164,13 @@ export function DesignUploadCard({
           style={{
             width: "100%",
             padding: "0.55rem 0.75rem",
-            fontSize: "0.84rem",
+            fontSize: "var(--text-sm)",
             borderRadius: "var(--radius-sm)",
             border: "1px solid var(--line)",
             background: "var(--ivory)",
             color: "var(--ink)",
             resize: "none",
             fontFamily: "var(--font-sans)",
-            outline: "none",
           }}
         />
       </div>
@@ -179,7 +178,7 @@ export function DesignUploadCard({
       {/* Submit Action */}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
         {onClose && (
-          <button type="button" onClick={onClose} disabled={busy} style={{ fontSize: "0.82rem", padding: "0.45rem 0.85rem" }}>
+          <button type="button" onClick={onClose} disabled={busy} style={{ fontSize: "var(--text-sm)", padding: "0.45rem 0.85rem" }}>
             Cancel
           </button>
         )}
@@ -188,7 +187,7 @@ export function DesignUploadCard({
           className="primary"
           onClick={handleConfirm}
           disabled={!file || busy}
-          style={{ fontSize: "0.84rem", padding: "0.5rem 1.1rem" }}
+          style={{ fontSize: "var(--text-sm)", padding: "0.5rem 1.1rem" }}
         >
           {busy ? (
             <>

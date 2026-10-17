@@ -96,13 +96,13 @@ export function OccasionStylistCard({
         )}
       </div>
 
-      <p style={{ fontSize: "0.82rem", color: "var(--muted)", margin: "0 0 0.85rem", lineHeight: 1.45 }}>
+      <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", margin: "0 0 0.85rem", lineHeight: 1.45 }}>
         Tell the Couturier about your upcoming event and share your photo. We will design an exclusive bespoke silhouette curated for your frame and occasion, and drape it directly onto you:
       </p>
 
       {/* Occasion Input with Suggestions */}
       <div style={{ marginBottom: "0.85rem" }}>
-        <label htmlFor="occasion-text-input" style={{ fontSize: "0.78rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
+        <label htmlFor="occasion-text-input" style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
           The Occasion / Dress Code
         </label>
         <input
@@ -116,12 +116,11 @@ export function OccasionStylistCard({
           style={{
             width: "100%",
             padding: "0.55rem 0.75rem",
-            fontSize: "0.88rem",
+            fontSize: "var(--text-base)",
             borderRadius: "var(--radius-sm)",
             border: "1px solid var(--line)",
             background: "var(--surface)",
             color: "var(--ink)",
-            outline: "none",
             marginBottom: "0.45rem",
           }}
         />
@@ -131,7 +130,7 @@ export function OccasionStylistCard({
               key={sug}
               type="button"
               className={`chip-btn ${occasion.toLowerCase() === sug.toLowerCase() ? "highlight" : ""}`}
-              style={{ fontSize: "0.74rem", padding: "0.22rem 0.55rem" }}
+              style={{ fontSize: "var(--text-xs)", padding: "0.22rem 0.55rem" }}
               onClick={() => setOccasion(sug)}
               disabled={busy}
             >
@@ -144,10 +143,10 @@ export function OccasionStylistCard({
       {/* Portrait Photo Section */}
       <div style={{ marginBottom: "0.85rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.35rem" }}>
-          <label style={{ fontSize: "0.78rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+          <label style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
             Your Portrait Photo
           </label>
-          <span style={{ fontSize: "0.75rem", color: "var(--gold-dark)", fontWeight: 500 }}>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--gold-dark)", fontWeight: 500 }}>
             For personalized tailoring &amp; virtual drape
           </span>
         </div>
@@ -175,7 +174,7 @@ export function OccasionStylistCard({
             <button
               type="button"
               className={`chip-btn ${useSavedPortrait ? "highlight" : ""}`}
-              style={{ fontSize: "0.75rem", padding: "0.25rem 0.6rem" }}
+              style={{ fontSize: "var(--text-xs)", padding: "0.25rem 0.6rem" }}
               onClick={() => {
                 setUseSavedPortrait(!useSavedPortrait);
                 if (!useSavedPortrait) {
@@ -208,8 +207,8 @@ export function OccasionStylistCard({
                     style={{ width: "60px", height: "80px", objectFit: "cover", borderRadius: "6px", border: "1px solid var(--gold)" }}
                   />
                   <div style={{ textAlign: "left" }}>
-                    <strong style={{ fontSize: "0.85rem", display: "block", color: "var(--ink)" }}>{file?.name}</strong>
-                    <span style={{ fontSize: "0.75rem", color: "var(--gold-dark)" }}>✦ Photo selected · Tap to replace</span>
+                    <strong style={{ fontSize: "var(--text-sm)", display: "block", color: "var(--ink)" }}>{file?.name}</strong>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--gold-dark)" }}>✦ Photo selected · Tap to replace</span>
                   </div>
                 </div>
               ) : (
@@ -217,32 +216,25 @@ export function OccasionStylistCard({
                   <div className="dropzone-icon">
                     <CameraIcon size={30} style={{ color: "var(--gold)" }} />
                   </div>
-                  <strong style={{ fontSize: "0.86rem", display: "block", color: "var(--ink)" }}>
+                  <strong style={{ fontSize: "var(--text-sm)", display: "block", color: "var(--ink)" }}>
                     Upload or snap your photo
                   </strong>
-                  <span style={{ fontSize: "0.76rem", color: "var(--muted)" }}>
+                  <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
                     Full-length or portrait · Plain background recommended
                   </span>
                 </div>
               )}
             </div>
 
-            <div
-              className="consent-row"
-              onClick={() => setConsent(!consent)}
-              style={{ cursor: "pointer", userSelect: "none", marginBottom: "0.75rem" }}
-            >
-              <span
-                className={`atelier-checkbox ${consent ? "checked" : ""}`}
-                role="checkbox"
-                aria-checked={consent}
-              >
+            <label className="consent-row" style={{ cursor: "pointer", userSelect: "none", marginBottom: "0.75rem" }}>
+              <input type="checkbox" className="sr-only" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+              <span className={`atelier-checkbox ${consent ? "checked" : ""}`} aria-hidden="true">
                 {consent && <CheckIcon size={11} />}
               </span>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
                 I consent to my photo being processed for custom tailoring &amp; virtual try-on. Body photos remain private and encrypted.
               </span>
-            </div>
+            </label>
           </>
         )}
       </div>
@@ -250,11 +242,11 @@ export function OccasionStylistCard({
       {/* Target Silhouette Gender */}
       <div style={{ marginBottom: "0.85rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.35rem" }}>
-          <label style={{ fontSize: "0.78rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+          <label style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
             Target Wardrobe
           </label>
           {!gender && (
-            <span style={{ fontSize: "0.72rem", color: "var(--gold-dark)", fontWeight: 500 }}>
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--gold-dark)", fontWeight: 500 }}>
               ✦ Auto-detect from portrait or select
             </span>
           )}
@@ -285,7 +277,7 @@ export function OccasionStylistCard({
 
       {/* Size Selection */}
       <div style={{ marginBottom: "0.85rem" }}>
-        <label style={{ fontSize: "0.78rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
+        <label style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
           Proportion Size
         </label>
         <div className="size-selector">
@@ -305,7 +297,7 @@ export function OccasionStylistCard({
 
       {/* Optional Styling Preferences */}
       <div style={{ marginBottom: "1rem" }}>
-        <label htmlFor="occasion-pref-input" style={{ fontSize: "0.78rem", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
+        <label htmlFor="occasion-pref-input" style={{ fontSize: "var(--text-xs)", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600, display: "block", marginBottom: "0.35rem" }}>
           Personal Preferences (Optional)
         </label>
         <input
@@ -319,12 +311,11 @@ export function OccasionStylistCard({
           style={{
             width: "100%",
             padding: "0.5rem 0.75rem",
-            fontSize: "0.84rem",
+            fontSize: "var(--text-sm)",
             borderRadius: "var(--radius-sm)",
             border: "1px solid var(--line)",
             background: "var(--ivory)",
             color: "var(--ink)",
-            outline: "none",
           }}
         />
       </div>
@@ -332,7 +323,7 @@ export function OccasionStylistCard({
       {/* Submit Action */}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.6rem" }}>
         {onClose && (
-          <button type="button" onClick={onClose} disabled={busy} style={{ fontSize: "0.82rem", padding: "0.45rem 0.85rem" }}>
+          <button type="button" onClick={onClose} disabled={busy} style={{ fontSize: "var(--text-sm)", padding: "0.45rem 0.85rem" }}>
             Cancel
           </button>
         )}
@@ -341,7 +332,7 @@ export function OccasionStylistCard({
           className="primary"
           onClick={handleConfirm}
           disabled={!canSubmit}
-          style={{ fontSize: "0.84rem", padding: "0.5rem 1.15rem" }}
+          style={{ fontSize: "var(--text-sm)", padding: "0.5rem 1.15rem" }}
         >
           {busy ? (
             <>

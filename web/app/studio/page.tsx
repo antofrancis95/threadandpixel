@@ -27,7 +27,6 @@ import {
   GoogleIcon,
   ImageIcon,
   LockIcon,
-  MannequinIcon,
   MenswearIcon,
   MenuIcon,
   MirrorIcon,
@@ -40,6 +39,8 @@ import {
   SparkleIcon,
   WomenswearIcon,
 } from "@/components/icons";
+import { GarmentFlat } from "@/components/landing/GarmentArt";
+import { DressForm, SalonMirror } from "@/components/StudioArt";
 import { StaticDrape } from "@/components/landing/HeroCloth";
 import { useLiveVoice } from "@/components/LiveVoice";
 import { ChatSkeleton, ShowcaseSkeleton } from "@/components/skeletons";
@@ -51,6 +52,7 @@ import { MeasurementCard } from "@/components/widgets/MeasurementCard";
 import { OccasionStylistCard } from "@/components/widgets/OccasionStylistCard";
 import { RunwayCard } from "@/components/widgets/RunwayCard";
 import type { MessageInput } from "@/lib/api";
+import { friendlyError } from "@/lib/friendlyError";
 import { STAGES, nextStep, type Stage, type StepAction } from "@/lib/nextStep";
 import { useStudioJobs, type StudioJob } from "@/lib/useJobs";
 import { useApp } from "@/lib/providers";
@@ -119,6 +121,11 @@ export default function AtelierStudio() {
   const prevSpecRef = useRef<{ id: string; spec: Spec } | null>(null);
   const [history, setHistory] = useState<Record<string, DesignVersion[]>>({});
   const [viewingVersion, setViewingVersion] = useState<number | null>(null);
+  // What the showcase shows: the current design, or the snapshot of an earlier version
+  // (every asset that version had). Actions always work on the current design.
+  const snapshot = design && viewingVersion !== null ? history[design.design_id]?.find((v) => v.version === viewingVersion) : undefined;
+  const viewed: Design | null = design && snapshot && snapshot.version !== design.version ? { ...design, ...snapshot } : design;
+  const lookingBack = Boolean(design && snapshot && snapshot.version !== design.version);
 
   useEffect(() => {
     if (!design?.image_url) {
@@ -138,15 +145,22 @@ export default function AtelierStudio() {
 
   useEffect(() => {
     if (!design?.image_url) return;
-    const { design_id, version, image_url } = design;
+    const { design_id, version, image_url, flats_url, tryon_url, runway_url } = design;
+    const snap: DesignVersion = { version, image_url, flats_url, tryon_url, runway_url };
     setHistory((h) => {
       const list = h[design_id] ?? [];
-      if (list.some((v) => v.version === version)) return h;
-      return { ...h, [design_id]: [...list, { version, image_url }].sort((a, b) => a.version - b.version) };
+      const existing = list.find((v) => v.version === version);
+      if (existing && JSON.stringify(existing) === JSON.stringify(snap)) return h;
+      const next = existing ? list.map((v) => (v.version === version ? snap : v)) : [...list, snap];
+      return { ...h, [design_id]: next.sort((a, b) => a.version - b.version) };
     });
-    setViewingVersion(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [design?.design_id, design?.version, design?.image_url]);
+  }, [design?.design_id, design?.version, design?.image_url, design?.flats_url, design?.tryon_url, design?.runway_url]);
+
+  // A new version always brings the board back to the present.
+  useEffect(() => {
+    setViewingVersion(null);
+  }, [design?.design_id, design?.version]);
   const [assetErrors, setAssetErrors] = useState<Record<string, boolean>>({});
 
   // The live Couturier. Callbacks are plain function declarations below (hoisted);
@@ -375,7 +389,7 @@ export default function AtelierStudio() {
       }
       loadArchive();
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError(e));
     } finally {
       setBusy(false);
     }
@@ -398,7 +412,7 @@ export default function AtelierStudio() {
         setActiveWidget(null);
       }
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError(e));
     } finally {
       setInitialLoading(false);
     }
@@ -429,7 +443,7 @@ export default function AtelierStudio() {
           `Speak 1 short, warm sentence inviting the client to inspect them.`,
       );
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError(e));
       tellVoice(
         `[ATELIER UPDATE]: Drafting the flats failed and nothing new is on the showcase board. Do NOT say it is ready. ` +
           `Speak 1 short sentence apologising and offering to try again.`,
@@ -464,7 +478,7 @@ export default function AtelierStudio() {
           `Speak 1 short, warm sentence telling the client so.`,
       );
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError(e));
       tellVoice(
         `[ATELIER UPDATE]: Recalibrating the flats failed and nothing changed on the showcase board. Do NOT say it is ready. ` +
           `Speak 1 short sentence apologising and offering to try again.`,
@@ -511,7 +525,7 @@ export default function AtelierStudio() {
           `Speak 1 short, warm sentence inviting the client to inspect the fit.`,
       );
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError(e));
       tellVoice(
         `[ATELIER UPDATE]: The virtual fitting failed (${(e as Error).message}) and nothing new is on the showcase board. Do NOT say it is ready. ` +
           `Speak 1 short sentence apologising and inviting the client to upload a clear, full-length, front-facing portrait to try again.`,
@@ -547,7 +561,7 @@ export default function AtelierStudio() {
           `Speak 1 short, warm sentence inviting the client to inspect the fit.`,
       );
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError(e));
       tellVoice(
         `[ATELIER UPDATE]: The virtual fitting failed and nothing new is on the showcase board. Do NOT say it is ready. ` +
           `Speak 1 short sentence apologising and offering to try again.`,
@@ -606,7 +620,7 @@ export default function AtelierStudio() {
       }
       loadArchive();
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError(e));
       tellVoice(
         `[ATELIER UPDATE]: The design could not be completed and nothing new is on the showcase board. Do NOT say it is ready. ` +
           `Speak 1 short sentence apologising and inviting the client to try again.`,
@@ -674,7 +688,7 @@ export default function AtelierStudio() {
       }
       loadArchive();
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError(e));
       tellVoice(
         `[ATELIER UPDATE]: The design could not be completed and nothing new is on the showcase board. Do NOT say it is ready. ` +
           `Speak 1 short sentence apologising and inviting the client to try again.`,
@@ -1310,10 +1324,28 @@ export default function AtelierStudio() {
               }}
               onDismiss={studioJobs.dismiss}
             />
-            <div className="view-tabs">
+            <div
+              className="view-tabs"
+              role="tablist"
+              aria-label="Showcase views"
+              onKeyDown={(e) => {
+                const order: ShowcaseTab[] = ["editorial", "flats", "tryon", "runway"];
+                const i = order.indexOf(activeTab);
+                if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  const next = order[(i + (e.key === "ArrowRight" ? 1 : order.length - 1)) % order.length];
+                  setActiveTab(next);
+                  (e.currentTarget.querySelector(`[data-tab="${next}"]`) as HTMLButtonElement | null)?.focus();
+                }
+              }}
+            >
               <button
                 type="button"
                 className={`view-tab ${activeTab === "editorial" ? "active" : ""}`}
+                role="tab"
+                aria-selected={activeTab === "editorial"}
+                tabIndex={activeTab === "editorial" ? 0 : -1}
+                data-tab="editorial"
                 onClick={() => setActiveTab("editorial")}
               >
                 <SparkleIcon size={12} />
@@ -1322,36 +1354,48 @@ export default function AtelierStudio() {
               <button
                 type="button"
                 className={`view-tab ${activeTab === "flats" ? "active" : ""}`}
+                role="tab"
+                aria-selected={activeTab === "flats"}
+                tabIndex={activeTab === "flats" ? 0 : -1}
+                data-tab="flats"
                 onClick={() => setActiveTab("flats")}
               >
                 <RulerIcon size={12} />
                 <span>Flats</span>
-                {design?.flats_url && <span className="tab-pill ready">{design.spec.size ? `size ${design.spec.size}` : "ready"}</span>}
+                {viewed?.flats_url && <span className="tab-pill ready">{viewed.spec.size ? `size ${viewed.spec.size}` : "ready"}</span>}
               </button>
               <button
                 type="button"
                 className={`view-tab ${activeTab === "tryon" ? "active" : ""}`}
+                role="tab"
+                aria-selected={activeTab === "tryon"}
+                tabIndex={activeTab === "tryon" ? 0 : -1}
+                data-tab="tryon"
                 onClick={() => setActiveTab("tryon")}
               >
                 <MirrorIcon size={12} />
                 <span>Fitting</span>
-                {design?.tryon_url && <span className="tab-pill ready">ready</span>}
+                {viewed?.tryon_url && <span className="tab-pill ready">ready</span>}
               </button>
               <button
                 type="button"
                 className={`view-tab ${activeTab === "runway" ? "active" : ""}`}
+                role="tab"
+                aria-selected={activeTab === "runway"}
+                tabIndex={activeTab === "runway" ? 0 : -1}
+                data-tab="runway"
                 onClick={() => setActiveTab("runway")}
               >
                 <FilmIcon size={12} />
                 <span>Runway</span>
-                {design?.runway_url && <span className="tab-pill ready">ready</span>}
+                {viewed?.runway_url && <span className="tab-pill ready">ready</span>}
               </button>
             </div>
           </div>
 
           {/* High-Resolution Frame */}
           <div className="canvas-frame">
-            {(busy || voiceDesigning) && (!design || !design.image_url) ? (
+            {(busy || voiceDesigning) && (!viewed || !viewed.image_url) ? (
               <div className="silk-shimmer-full">
                 <div className="shimmer-aura">
                   <span className="shimmer-icon">
@@ -1361,9 +1405,9 @@ export default function AtelierStudio() {
                 <h3 className="shimmer-title">Draping Haute Couture Silhouette</h3>
                 <span className="shimmer-subtitle">Weaving bespoke textiles &amp; formulating tailoring specs…</span>
               </div>
-            ) : design && design.image_url ? (
+            ) : viewed && viewed.image_url ? (
               <>
-                {(busy || voiceDesigning || (tryonBusy && !!design.tryon_url)) && (
+                {(busy || voiceDesigning || (tryonBusy && !!viewed.tryon_url)) && (
                   <div className="silk-shimmer-overlay">
                     <span className="spin-silk">
                       <SparkleIcon size={13} />
@@ -1373,7 +1417,19 @@ export default function AtelierStudio() {
                 )}
 
                 {/* Error Fallback when asset preview fails to load */}
-                {assetErrors[activeTab] ? (
+                <div key={activeTab} className="canvas-view">
+                {lookingBack && activeTab !== "editorial" && !viewed[`${activeTab === "tryon" ? "tryon" : activeTab}_url` as "flats_url" | "tryon_url" | "runway_url"] ? (
+                  <div className="asset-empty-state">
+                    <span className="mannequin-badge">✦ Version {viewingVersion}</span>
+                    <h3 className="asset-empty-title">
+                      {activeTab === "flats" ? "No flats were drafted for this version" : activeTab === "tryon" ? "This version was never fitted" : "No runway film for this version"}
+                    </h3>
+                    <p className="asset-empty-desc">Go back to the current version to {activeTab === "flats" ? "draft the flats" : activeTab === "tryon" ? "step into the fitting room" : "film the runway"}.</p>
+                    <button type="button" className="secondary small" onClick={() => setViewingVersion(null)}>
+                      Back to current
+                    </button>
+                  </div>
+                ) : assetErrors[activeTab] ? (
                   <div className="asset-empty-state">
                     <div className="asset-empty-icon-ring error">
                       <AlertTriangleIcon size={24} />
@@ -1428,10 +1484,10 @@ export default function AtelierStudio() {
                     )}
                   </div>
                 ) : activeTab === "flats" ? (
-                  design.flats_url ? (
+                  viewed.flats_url ? (
                     <div className="flats-view">
                       <img
-                        src={design.flats_url}
+                        src={viewed.flats_url}
                         alt="Technical flat sketch"
                         onError={() => setAssetErrors((e) => ({ ...e, flats: true }))}
                       />
@@ -1449,17 +1505,17 @@ export default function AtelierStudio() {
                           gap: "0.4rem",
                         }}
                       >
-                        <span style={{ fontSize: "0.78rem", color: "var(--ink-secondary)" }}>
-                          Calibrated: <strong style={{ color: "var(--gold-dark)" }}>{design.spec.size ? `Size ${design.spec.size}` : "Proportional Draft"}</strong>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--ink-secondary)" }}>
+                          Calibrated: <strong style={{ color: "var(--gold-dark)" }}>{viewed.spec.size ? `Size ${viewed.spec.size}` : "Proportional Draft"}</strong>
                         </span>
                         <div style={{ display: "flex", gap: "0.3rem", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.72rem", color: "var(--muted)", marginRight: "0.2rem" }}>Re-calibrate:</span>
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginRight: "0.2rem" }}>Re-calibrate:</span>
                           {(["XS", "S", "M", "L", "XL", "XXL"] as const).map((sz) => (
                             <button
                               key={sz}
                               type="button"
-                              className={`chip-btn ${design.spec.size === sz ? "highlight" : ""}`}
-                              style={{ padding: "0.2rem 0.45rem", fontSize: "0.72rem" }}
+                              className={`chip-btn ${viewed.spec.size === sz ? "highlight" : ""}`}
+                              style={{ padding: "0.2rem 0.45rem", fontSize: "var(--text-xs)" }}
                               onClick={() => generateFlats(sz)}
                               disabled={busy}
                             >
@@ -1471,8 +1527,8 @@ export default function AtelierStudio() {
                     </div>
                   ) : (
                     <div className="asset-empty-state">
-                      <div className="asset-empty-icon-ring">
-                        <RulerIcon size={26} />
+                      <div className="canvas-art flat" aria-hidden="true">
+                        <GarmentFlat compact />
                       </div>
                       <span className="mannequin-badge">✦ Technical Drawing &amp; CAD Measurements</span>
                       <h3 className="asset-empty-title">Draft Architectural Technical Flats</h3>
@@ -1492,8 +1548,8 @@ export default function AtelierStudio() {
                           <button
                             key={sz}
                             type="button"
-                            className={`chip-btn ${design.spec.size === sz ? "highlight" : ""}`}
-                            style={{ padding: "0.45rem 0.85rem", fontSize: "0.82rem", fontWeight: 600 }}
+                            className={`chip-btn ${viewed.spec.size === sz ? "highlight" : ""}`}
+                            style={{ padding: "0.45rem 0.85rem", fontSize: "var(--text-sm)", fontWeight: 600 }}
                             onClick={() => generateFlats(sz)}
                             disabled={busy}
                           >
@@ -1513,7 +1569,7 @@ export default function AtelierStudio() {
                     </div>
                   )
                 ) : activeTab === "tryon" ? (
-                  tryonBusy && !design.tryon_url ? (
+                  tryonBusy && !viewed.tryon_url ? (
                     <div className="silk-shimmer-full" role="status" aria-live="polite">
                       <div className="shimmer-aura">
                         <span className="shimmer-icon">
@@ -1523,28 +1579,28 @@ export default function AtelierStudio() {
                       <h3 className="shimmer-title">Draping You in the Salon Mirror</h3>
                       <span className="shimmer-subtitle">Fitting the garment to your portrait. This takes a moment…</span>
                     </div>
-                  ) : design.tryon_url ? (
+                  ) : viewed.tryon_url ? (
                     <CrossfadeImage
-                      src={design.tryon_url}
+                      src={viewed.tryon_url}
                       alt="Virtual try-on drape"
                       onError={() => setAssetErrors((e) => ({ ...e, tryon: true }))}
                     />
                   ) : (
                     <div className="asset-empty-state">
-                      <div className="asset-empty-icon-ring">
-                        <MirrorIcon size={26} />
+                      <div className="canvas-art" aria-hidden="true">
+                        <SalonMirror />
                       </div>
                       <span className="mannequin-badge">✦ Salon Mirror</span>
                       <h3 className="asset-empty-title">
-                        {design.has_vto_portrait ? "Saved Portrait Ready" : "Virtual Fitting Not Yet Draped"}
+                        {viewed.has_vto_portrait ? "Saved Portrait Ready" : "Virtual Fitting Not Yet Draped"}
                       </h3>
                       <p className="asset-empty-desc">
-                        {design.has_vto_portrait
+                        {viewed.has_vto_portrait
                           ? "Your portrait is safely saved in the atelier. Drape this updated piece onto your portrait, or open the fitting room to upload a new one."
                           : "Upload your full-length portrait to step into the virtual salon mirror and drape this bespoke creation directly onto your frame."}
                       </p>
                       <div style={{ display: "flex", gap: "0.6rem", justifyContent: "center", flexWrap: "wrap" }}>
-                        {design.has_vto_portrait && (
+                        {viewed.has_vto_portrait && (
                           <button
                             type="button"
                             className="primary"
@@ -1557,18 +1613,18 @@ export default function AtelierStudio() {
                         )}
                         <button
                           type="button"
-                          className={design.has_vto_portrait ? "secondary" : "primary"}
+                          className={viewed.has_vto_portrait ? "secondary" : "primary"}
                           onClick={() => setActiveWidget("fitting")}
                           disabled={tryonBusy}
                         >
                           <MirrorIcon size={14} />
-                          <span>{design.has_vto_portrait ? "Re-upload Portrait" : "Enter Virtual Fitting Room"}</span>
+                          <span>{viewed.has_vto_portrait ? "Re-upload Portrait" : "Enter Virtual Fitting Room"}</span>
                         </button>
                       </div>
                     </div>
                   )
                 ) : activeTab === "runway" ? (
-                  runwayJob?.status === "running" && !design.runway_url ? (
+                  runwayJob?.status === "running" && !viewed.runway_url ? (
                     <div className="silk-shimmer-full" role="status" aria-live="polite">
                       <div className="shimmer-aura">
                         <span className="shimmer-icon">
@@ -1578,9 +1634,9 @@ export default function AtelierStudio() {
                       <h3 className="shimmer-title">Filming the runway</h3>
                       <span className="shimmer-subtitle">Usually one to two minutes. Keep designing; the film will appear here.</span>
                     </div>
-                  ) : design.runway_url ? (
+                  ) : viewed.runway_url ? (
                     <video
-                      src={design.runway_url}
+                      src={viewed.runway_url}
                       controls
                       autoPlay
                       loop
@@ -1610,45 +1666,40 @@ export default function AtelierStudio() {
                   )
                 ) : (
                   <CrossfadeImage
-                    src={
-                      (viewingVersion !== null &&
-                        history[design.design_id]?.find((v) => v.version === viewingVersion)?.image_url) ||
-                      design.image_url
-                    }
+                    src={viewed.image_url}
                     alt="High-resolution couture garment render"
                     onError={() => setAssetErrors((e) => ({ ...e, editorial: true }))}
                   />
                 )}
+                </div>
               </>
             ) : (
               <div className="canvas-placeholder">
                 <span className="mannequin-badge">
                   <SparkleIcon size={10} /> {design && design.version === 0 ? "✦ Consultation in Progress" : "Bespoke Canvas"}
                 </span>
-                <div className="mannequin-silhouette">
-                  <MannequinIcon size={34} />
+                <div className="canvas-art" aria-hidden="true">
+                  <DressForm />
                 </div>
                 <strong style={{ fontFamily: "var(--font-serif)", fontSize: "1.15rem", color: "var(--ink)" }}>
                   The Atelier Mannequin
                 </strong>
-                <p style={{ margin: 0, fontSize: "0.82rem", maxWidth: "320px", color: "var(--muted)", lineHeight: 1.5 }}>
+                <p style={{ margin: 0, fontSize: "var(--text-sm)", maxWidth: "320px", color: "var(--muted)", lineHeight: 1.5 }}>
                   {design && design.version === 0
                     ? "Consulting on your bespoke color, fit, fabric, and size. Draping will commence as soon as specifications are chosen."
                     : "Your bespoke design will be draped here as you speak or describe your silhouette to the Couturier."}
                 </p>
               </div>
             )}
+            {design && (
+              <VersionStrip
+                versions={history[design.design_id] ?? []}
+                current={design.version}
+                viewing={lookingBack ? viewingVersion : null}
+                onView={setViewingVersion}
+              />
+            )}
           </div>
-
-          {design && activeTab === "editorial" && (
-            <VersionStrip
-              versions={history[design.design_id] ?? []}
-              current={design.version}
-              viewing={viewingVersion}
-              onView={setViewingVersion}
-            />
-          )}
-
           <NextSteps step={step} voiceActive={voice.active} onAction={runStep} onJump={jumpToStage} />
 
           {/* Garment Details & Spec Ribbon */}
@@ -1661,73 +1712,54 @@ export default function AtelierStudio() {
                 changed={changedSpec}
               />
 
-              {/* Quick Atelier Actions Toolbar */}
+              {/* One row of secondary actions; upload and occasion live in the composer, the next step in the rail */}
               <div className="showcase-actions">
                 <button
                   type="button"
-                  className={`showcase-action-btn ${activeWidget === "design_upload" ? "active" : ""}`}
-                  onClick={() => setActiveWidget(activeWidget === "design_upload" ? null : "design_upload")}
-                  title="Upload a design or sketch"
-                >
-                  <ImageIcon size={14} />
-                  <span>Upload a sketch</span>
-                </button>
-                <button
-                  type="button"
-                  className={`showcase-action-btn ${activeWidget === "occasion_stylist" ? "active" : ""}`}
-                  onClick={() => setActiveWidget(activeWidget === "occasion_stylist" ? null : "occasion_stylist")}
-                  title="Design for an occasion and photo"
-                >
-                  <PartyIcon size={14} />
-                  <span>Occasion stylist</span>
-                </button>
-                <button
-                  type="button"
-                  className={`showcase-action-btn ${activeWidget === "measurements" ? "active" : ""}`}
+                  className="secondary small"
+                  aria-pressed={activeWidget === "measurements"}
                   onClick={() => setActiveWidget(activeWidget === "measurements" ? null : "measurements")}
                 >
-                  <ScissorsIcon size={14} />
+                  <ScissorsIcon size={13} />
                   <span>Measurements</span>
                 </button>
                 <button
                   type="button"
-                  className={`showcase-action-btn ${activeWidget === "fitting" ? "active" : ""}`}
+                  className="secondary small"
+                  aria-pressed={activeWidget === "fitting"}
                   onClick={() => setActiveWidget(activeWidget === "fitting" ? null : "fitting")}
                 >
-                  <MirrorIcon size={14} />
+                  <MirrorIcon size={13} />
                   <span>Fitting room</span>
                 </button>
                 <button
                   type="button"
-                  className="showcase-action-btn"
-                  onClick={() => {
-                    setActiveTab("flats");
-                    if (!design.flats_url && design.spec.size) {
-                      generateFlats(design.spec.size);
-                    }
-                  }}
+                  className="secondary small"
+                  onClick={() => runStep({ kind: "flats", size: design.spec.size })}
                   disabled={busy}
                 >
-                  <RulerIcon size={14} />
+                  <RulerIcon size={13} />
                   <span>{design.flats_url ? "View flats" : "Draft flats"}</span>
                 </button>
                 <button
                   type="button"
-                  className={`showcase-action-btn ${activeWidget === "runway" ? "active" : ""}`}
+                  className="secondary small"
+                  aria-pressed={activeWidget === "runway"}
                   onClick={() => {
                     setActiveWidget("runway");
                     if (design.runway_url) setActiveTab("runway");
                   }}
                 >
-                  <FilmIcon size={14} />
-                  <span>Film runway</span>
+                  <FilmIcon size={13} />
+                  <span>{design.runway_url ? "Runway" : "Film runway"}</span>
                 </button>
                 <button
                   type="button"
-                  className={`showcase-action-btn ${activeWidget === "commission" ? "active" : ""}`}
+                  className="secondary small"
+                  aria-pressed={activeWidget === "commission"}
                   onClick={() => runStep({ kind: "techpack" })}
                 >
-                  <ClipboardIcon size={14} />
+                  <ClipboardIcon size={13} />
                   <span>Tech pack</span>
                 </button>
               </div>

@@ -30,6 +30,10 @@ export function CrossfadeImage({ src, alt, onError }: { src: string; alt: string
       {layers.map((l, i) => (
         <img
           key={l.key}
+          ref={(el) => {
+            // A cached image can finish before React attaches onLoad; catch it here.
+            if (el && !l.loaded && el.complete && el.naturalWidth > 0) loaded(l.key);
+          }}
           src={l.src}
           alt={i === layers.length - 1 ? alt : ""}
           aria-hidden={i !== layers.length - 1 || undefined}

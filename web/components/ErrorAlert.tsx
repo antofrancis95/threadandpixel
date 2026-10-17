@@ -6,10 +6,11 @@ import { AlertTriangleIcon, CloseIcon } from "./icons";
 export function ErrorAlert({
   message,
   onClose,
-  duration = 6000,
+  duration = 0,
 }: {
   message: string | null;
   onClose: () => void;
+  /** Milliseconds before it dismisses itself; 0 (the default) keeps it until the client closes it. */
   duration?: number;
 }) {
   const [visible, setVisible] = useState(Boolean(message));
@@ -20,6 +21,7 @@ export function ErrorAlert({
       return;
     }
     setVisible(true);
+    if (!duration) return;
     const timer = setTimeout(() => {
       setVisible(false);
       onClose();
@@ -50,10 +52,7 @@ export function ErrorAlert({
       >
         <CloseIcon size={13} />
       </button>
-      <div
-        className="error-banner-timer"
-        style={{ animationDuration: `${duration}ms` }}
-      />
+      {duration > 0 && <div className="error-banner-timer" style={{ animationDuration: `${duration}ms` }} />}
     </div>
   );
 }

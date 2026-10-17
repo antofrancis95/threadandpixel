@@ -48,7 +48,7 @@ export function NextSteps({
           <span className="next-steps-kicker">{step.stage ? "Next" : "Done"}</span>
           <span>{step.sentence}</span>
         </p>
-        <button type="button" className="next-steps-btn" onClick={() => onAction(step.action)}>
+        <button type="button" className="primary small say next-steps-btn" onClick={() => onAction(step.action)}>
           {step.action.kind === "talk" ? <MicIcon size={13} /> : <span className="next-steps-quote" aria-hidden="true">“</span>}
           <span>{step.action.kind === "talk" ? "Talk live" : step.say}</span>
           {step.action.kind !== "talk" && <span className="next-steps-quote" aria-hidden="true">”</span>}

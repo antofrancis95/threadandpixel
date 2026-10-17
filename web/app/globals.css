@@ -41,6 +41,12 @@
   --dur-base: 260ms;
   --dur-slow: 600ms;
 
+  /* Type scale for studio UI copy (headings use the serif rules below) */
+  --text-xs: 0.74rem;
+  --text-sm: 0.82rem;
+  --text-base: 0.9rem;
+  --text-lg: 1.05rem;
+
   --font-serif: var(--font-playfair), "Playfair Display", Didot, "Bodoni MT", Georgia, "Times New Roman", serif;
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
@@ -260,56 +266,57 @@ button.secondary:active:not(:disabled) {
   box-shadow: inset 0 1px 3px rgba(35, 25, 15, 0.1);
 }
 
-/* Microphone Button (Jewel-crafted Tactile Audio Circle) */
-/* Composer Quick Action Buttons (Upload design, Occasion stylist) */
-button.composer-icon-btn {
+/* ---- Modifiers shared by the three families (primary, secondary, chip) ---- */
+button.small {
+  height: 34px;
+  padding: 0 0.85rem;
+  font-size: var(--text-xs);
+  gap: 0.4rem;
+}
+
+button.icon {
   width: 44px;
   height: 44px;
   min-width: 44px;
-  min-height: 44px;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #FFFFFF 0%, #F6EFE6 100%);
-  border: 1px solid rgba(197, 168, 128, 0.55);
-  color: var(--ink);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
   padding: 0;
-  box-shadow: 
-    0 2px 5px rgba(35, 25, 15, 0.08),
-    0 6px 14px -3px rgba(197, 168, 128, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-  flex-shrink: 0;
+  border-radius: 50%;
 }
 
-button.composer-icon-btn:hover:not(:disabled) {
-  transform: translateY(-1.5px) scale(1.06);
+button.secondary[aria-pressed="true"] {
   border-color: var(--gold);
-  background: linear-gradient(180deg, #FFFFFF 0%, #EDE2CF 100%);
-  color: var(--gold-dark);
-  box-shadow: 
-    0 4px 10px rgba(35, 25, 15, 0.1),
-    0 8px 20px -2px rgba(197, 168, 128, 0.4),
-    inset 0 1px 0 #FFFFFF;
+  background: linear-gradient(180deg, #FAF2E4 0%, #EFE1C8 100%);
+  color: #7A5726;
+  font-weight: 600;
+  box-shadow:
+    0 2px 8px rgba(197, 168, 128, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
-button.composer-icon-btn:active:not(:disabled) {
-  transform: translateY(1px) scale(0.97);
-  box-shadow: 
-    0 1px 3px rgba(35, 25, 15, 0.1),
-    inset 0 1px 3px rgba(197, 168, 128, 0.3);
+button.secondary.end:hover:not(:disabled) {
+  border-color: rgba(168, 88, 88, 0.5);
+  background: var(--rose-light);
+  color: var(--rose);
 }
 
-button.composer-icon-btn.active {
-  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-dark) 100%);
-  color: #FFFFFF;
-  border-color: var(--gold-dark);
-  box-shadow: 0 2px 8px rgba(197, 168, 128, 0.5);
+/* Something you could say aloud: serif italic, gold quote marks */
+button.say {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.92rem;
+  letter-spacing: 0.005em;
+  gap: 0.15rem;
 }
 
+button.say .next-steps-quote {
+  color: var(--gold);
+  font-style: normal;
+}
+
+button.say svg {
+  margin-right: 0.35rem;
+}
+
+/* Microphone Button (Jewel-crafted Tactile Audio Circle) */
 
 /* Studio Main Grid Layout */
 .studio {
@@ -1173,10 +1180,20 @@ button.composer-icon-btn.active {
 /* Garment Spec Chips */
 .spec-ribbon {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.45rem;
   align-items: center;
   padding: 0.5rem 0;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.spec-ribbon::-webkit-scrollbar {
+  display: none;
+}
+
+.spec-ribbon > .spec-chip {
   flex-shrink: 0;
 }
 
@@ -1203,62 +1220,21 @@ button.composer-icon-btn.active {
 /* Quick Action Bar under Showcase */
 .showcase-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  flex-shrink: 0;
-}
-
-.showcase-action-btn {
-  flex: 1 1 calc(20% - 0.5rem);
-  min-width: 108px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  flex-wrap: nowrap;
   gap: 0.45rem;
-  padding: 0.65rem 0.8rem;
-  font-size: 0.8rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, #FFFFFF 0%, #FBF8F4 100%);
-  text-align: center;
-  font-weight: 500;
-  color: var(--ink-secondary);
-  box-shadow: 
-    0 1px 3px rgba(35, 25, 15, 0.04),
-    0 3px 8px -2px rgba(35, 25, 15, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: pointer;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.showcase-actions::-webkit-scrollbar {
+  display: none;
+}
+
+.showcase-actions > button {
+  flex: 1 0 auto;
   white-space: nowrap;
-}
-
-.showcase-action-btn:hover:not(:disabled) {
-  border-color: var(--gold);
-  background: var(--gold-light);
-  background: linear-gradient(180deg, #FFFFFF 0%, #F5ECE0 100%);
-  color: var(--ink);
-  transform: translateY(-1.5px);
-  box-shadow: 
-    0 4px 10px rgba(35, 25, 15, 0.07),
-    0 8px 18px -2px rgba(197, 168, 128, 0.28),
-    inset 0 1px 0 #FFFFFF;
-}
-
-.showcase-action-btn.active {
-  border-color: var(--gold);
-  background: var(--gold-light);
-  color: var(--gold-dark);
-  background: linear-gradient(180deg, #FAF2E4 0%, #EFE1C8 100%);
-  color: #7A5726;
-  font-weight: 600;
-  box-shadow: 
-    0 2px 8px rgba(197, 168, 128, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 2px rgba(197, 168, 128, 0.25);
-}
-
-.showcase-action-btn:active:not(:disabled) {
-  transform: translateY(1px) scale(0.985);
 }
 
 /* Tech Pack & Receipt Card */
@@ -1715,6 +1691,22 @@ button.composer-icon-btn.active {
 @keyframes slideLeft {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
+}
+
+.drawer-overlay.closing {
+  animation: fadeOut var(--dur-base) var(--ease) forwards;
+}
+
+.drawer-overlay.closing .drawer-panel {
+  animation: slideRight var(--dur-base) var(--ease) forwards;
+}
+
+@keyframes fadeOut {
+  to { opacity: 0; }
+}
+
+@keyframes slideRight {
+  to { transform: translateX(100%); }
 }
 
 .drawer-head {
@@ -2974,11 +2966,10 @@ button.composer-icon-btn.active {
     gap: 0.4rem;
     padding-top: 0.6rem;
   }
-  button.composer-icon-btn {
+  button.icon {
     width: 38px;
     height: 38px;
     min-width: 38px;
-    min-height: 38px;
   }
   .composer-atelier input {
     height: 42px;
@@ -2999,7 +2990,14 @@ button.composer-icon-btn.active {
     display: none;
   }
 
-  /* ---- Showcase pane: the panel scrolls; the canvas takes its natural height ---- */
+  /* ---- Showcase pane: the panel scrolls; the canvas is a 3:4 frame of the width,
+     since its layers are absolutely positioned and give it no natural height ---- */
+  .canvas-frame {
+    flex: none;
+    aspect-ratio: 3 / 4;
+    height: auto;
+    min-height: 0;
+  }
   .showcase-panel {
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -3078,15 +3076,6 @@ button.composer-icon-btn.active {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.45rem;
-  }
-  .showcase-action-btn {
-    min-width: 0;
-    min-height: 44px;
-    padding: 0.55rem 0.6rem;
-    font-size: 0.78rem;
-  }
-  .showcase-actions > .showcase-action-btn:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
   }
   .actions-skeleton-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3193,9 +3182,7 @@ button.composer-icon-btn.active {
 @media (hover: none) {
   button.primary:hover:not(:disabled),
   button.secondary:hover:not(:disabled),
-  button.composer-icon-btn:hover:not(:disabled),
   .chip-btn:hover,
-  .showcase-action-btn:hover:not(:disabled),
   .archive-trigger-btn:hover,
   .google-signin-btn:hover,
   .auth-submit-btn:hover,
@@ -3513,50 +3500,6 @@ button.composer-icon-btn.active {
   margin-top: 0.8rem;
 }
 
-.voice-ctl {
-  height: 38px;
-  padding: 0 0.95rem;
-  gap: 0.4rem;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 0.82rem;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease);
-}
-
-.voice-ctl:hover:not(:disabled) {
-  border-color: var(--gold);
-  background: var(--gold-light);
-}
-
-.voice-ctl[aria-pressed="true"] {
-  background: var(--cream);
-  color: var(--muted);
-}
-
-.voice-ctl.end:hover:not(:disabled) {
-  border-color: rgba(168, 88, 88, 0.5);
-  background: var(--rose-light);
-  color: var(--rose);
-}
-
-.voice-ctl.primary {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: #FAF7F2;
-}
-
-.voice-ctl.primary:hover:not(:disabled) {
-  background: #2D2926;
-  border-color: #2D2926;
-  color: #FFFFFF;
-}
-
 .voice-notice {
   display: flex;
   align-items: flex-start;
@@ -3615,29 +3558,6 @@ button.composer-icon-btn.active {
   justify-content: center;
   gap: 0.4rem;
   max-width: 42rem;
-}
-
-.voice-example {
-  padding: 0.42rem 0.95rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-full);
-  background: var(--surface);
-  color: var(--ink-secondary);
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 0.95rem;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease);
-}
-
-.voice-example:hover {
-  border-color: var(--gold);
-  background: var(--gold-light);
-  color: var(--ink);
-  transform: translateY(-1px);
 }
 
 .voice-examples-hint {
@@ -3733,7 +3653,7 @@ button.composer-icon-btn.active {
   padding: 0.4rem 0.4rem 0.4rem 0.7rem;
 }
 
-.voice-dock .voice-ctl {
+.voice-dock button.small {
   height: 34px;
   padding: 0 0.75rem;
 }
@@ -3760,10 +3680,10 @@ button.composer-icon-btn.active {
   .voice-dock .voice-thread {
     display: none;
   }
-  .voice-dock .voice-ctl.end span {
+  .voice-dock .end span {
     display: none;
   }
-  .voice-dock .voice-ctl.end {
+  .voice-dock .end {
     width: 34px;
     padding: 0;
   }
@@ -3934,30 +3854,6 @@ button.composer-icon-btn.active {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--gold-dark);
-}
-
-.next-steps-btn {
-  height: 34px;
-  padding: 0 0.9rem;
-  gap: 0.15rem;
-  border-radius: var(--radius-full);
-  background: var(--ink);
-  color: #FAF7F2;
-  border: 1px solid var(--ink);
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 0.92rem;
-  letter-spacing: 0.005em;
-  transition:
-    background var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
-}
-
-.next-steps-btn:hover:not(:disabled) {
-  background: #2D2926;
-  box-shadow: var(--shadow-gold);
-  transform: translateY(-1px);
 }
 
 .next-steps-btn svg {
@@ -4211,36 +4107,45 @@ button.composer-icon-btn.active {
   }
 }
 
-/* Versions of the current design seen this session */
+/* Versions of the current design, as a rail over the frame's empty margin */
 .version-strip {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  bottom: 10px;
+  z-index: 3;
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.75rem;
-  flex-shrink: 0;
-  padding-top: 0.5rem;
-}
-
-.version-strip-label {
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--muted);
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  pointer-events: none;
 }
 
 .version-strip-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0.35rem;
   display: flex;
-  gap: 0.4rem;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--line-light);
+  pointer-events: auto;
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.version-strip-list::-webkit-scrollbar {
+  display: none;
 }
 
 .version-thumb {
   position: relative;
-  width: 36px;
-  height: 48px;
+  width: 40px;
+  height: 54px;
   padding: 0;
   border-radius: 6px;
   overflow: hidden;
@@ -4283,14 +4188,27 @@ button.composer-icon-btn.active {
 }
 
 .version-strip-note {
-  font-size: 0.76rem;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--line-light);
+  font-size: 0.72rem;
   color: var(--ink-secondary);
+  white-space: nowrap;
+  pointer-events: auto;
+  animation: fadeSlideUp var(--dur-base) var(--ease) both;
 }
 
 .version-strip-back {
-  padding: 0.1rem 0.5rem;
-  margin-left: 0.2rem;
-  font-size: 0.74rem;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--gold-dark);
   text-decoration: underline;
@@ -4298,8 +4216,179 @@ button.composer-icon-btn.active {
 }
 
 @media (max-width: 767px) {
+  .version-strip {
+    top: auto;
+    right: 10px;
+    bottom: 10px;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: flex-end;
+  }
+  .version-strip-list {
+    flex-direction: row;
+    max-width: 100%;
+    overflow-x: auto;
+  }
   .version-thumb {
     width: 32px;
     height: 42px;
   }
+  .version-strip-note {
+    position: static;
+  }
+}
+
+
+/* =========================================================================
+   Layer 4: focus, tab transitions, drawn empty states, keyboard archive
+   ========================================================================= */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.atelier-app textarea {
+  outline: none;
+}
+
+.atelier-app textarea:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* The checkbox is a real input (screen readers, keyboard); the span is its face. */
+.consent-row:has(input:focus-visible) .atelier-checkbox {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.consent-row:has(input:disabled) {
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* Tab content enters with a short rise so switching views never snaps */
+.canvas-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: canvasIn var(--dur-base) var(--ease) both;
+}
+
+@keyframes canvasIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Drawn garments in the empty states, in place of icon rings */
+.canvas-art {
+  width: 112px;
+  height: 170px;
+  margin-bottom: 0.75rem;
+  opacity: 0.85;
+  animation: fadeSlideUp var(--dur-slow) var(--ease) both;
+}
+
+.canvas-art.flat {
+  width: 220px;
+  height: 160px;
+}
+
+.canvas-art .lp-garment {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.lp-garment .ink {
+  stroke: var(--ink);
+  fill: none;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lp-garment .ink-soft {
+  stroke: var(--muted-light);
+  fill: none;
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+
+.lp-garment .sketch {
+  stroke: var(--ink);
+  fill: none;
+  stroke-width: 1.1;
+  stroke-linecap: round;
+}
+
+.lp-garment .gold {
+  stroke: var(--gold);
+  fill: none;
+  stroke-width: 1;
+}
+
+.lp-garment .gold-text {
+  fill: var(--gold-dark);
+  font-family: var(--font-sans);
+  font-size: 7px;
+  letter-spacing: 0.04em;
+}
+
+.lp-garment .silk {
+  fill: url(#lpSilk);
+}
+
+.lp-garment .skin {
+  fill: var(--cream);
+}
+
+/* Archive cards are buttons now: reset the button defaults they inherit */
+button.archive-item-card {
+  width: 100%;
+  text-align: left;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  color: inherit;
+  border-radius: var(--radius-md);
+  justify-content: flex-start;
+}
+
+button.archive-item-card:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.archive-item-thumb,
+.archive-item-info,
+.archive-item-meta,
+.archive-thumb-placeholder {
+  display: flex;
+}
+
+.archive-item-info {
+  flex-direction: column;
+}
+
+.archive-thumb-placeholder {
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.view-tab:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }

@@ -64,10 +64,10 @@ export function FittingRoomCard({
           <div style={{ display: "flex", alignItems: "center", gap: "0.55rem" }}>
             <SparkleIcon size={16} style={{ color: "var(--gold)" }} />
             <div>
-              <strong style={{ fontSize: "0.84rem", display: "block", color: "var(--ink)" }}>
+              <strong style={{ fontSize: "var(--text-sm)", display: "block", color: "var(--ink)" }}>
                 Saved Fitting Portrait Active
               </strong>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
                 Your portrait is preserved on file. Drape this updated piece directly onto it.
               </span>
             </div>
@@ -86,7 +86,7 @@ export function FittingRoomCard({
         </div>
       )}
 
-      <p style={{ fontSize: "0.82rem", color: "var(--muted)", margin: "0 0 0.75rem" }}>
+      <p style={{ fontSize: "var(--text-sm)", color: "var(--muted)", margin: "0 0 0.75rem" }}>
         {hasExistingPortrait
           ? "Or upload a different portrait to replace your saved fitting photo:"
           : "Upload a full-length, front-facing portrait to drape this garment directly onto yourself:"}
@@ -107,8 +107,8 @@ export function FittingRoomCard({
               style={{ width: "60px", height: "80px", objectFit: "cover", borderRadius: "6px" }}
             />
             <div style={{ textAlign: "left" }}>
-              <strong style={{ fontSize: "0.85rem", display: "block" }}>{file?.name}</strong>
-              <span style={{ fontSize: "0.75rem", color: "var(--muted)" }}>
+              <strong style={{ fontSize: "var(--text-sm)", display: "block" }}>{file?.name}</strong>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
                 {busy ? "Draping in progress…" : "Tap to replace photo"}
               </span>
             </div>
@@ -118,32 +118,31 @@ export function FittingRoomCard({
             <div className="dropzone-icon">
               <CameraIcon size={32} style={{ color: "var(--gold)" }} />
             </div>
-            <strong style={{ fontSize: "0.88rem", display: "block", color: "var(--ink)" }}>
+            <strong style={{ fontSize: "var(--text-base)", display: "block", color: "var(--ink)" }}>
               Upload or snap a portrait
             </strong>
-            <span style={{ fontSize: "0.78rem", color: "var(--muted)" }}>
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
               JPEG, PNG or WebP · Plain background works best
             </span>
           </div>
         )}
       </div>
 
-      <div
-        className="consent-row"
-        onClick={() => !busy && setConsent(!consent)}
-        style={{ cursor: busy ? "default" : "pointer", userSelect: "none" }}
-      >
-        <span
-          className={`atelier-checkbox ${consent ? "checked" : ""}`}
-          role="checkbox"
-          aria-checked={consent}
-        >
+      <label className="consent-row" style={{ cursor: busy ? "default" : "pointer", userSelect: "none" }}>
+        <input
+          type="checkbox"
+          className="sr-only"
+          checked={consent}
+          disabled={busy}
+          onChange={(e) => setConsent(e.target.checked)}
+        />
+        <span className={`atelier-checkbox ${consent ? "checked" : ""}`} aria-hidden="true">
           {consent && <CheckIcon size={11} />}
         </span>
         <span>
-          I consent to my photo being processed by Vertex AI for virtual try-on. Body photos are private, never shared, and automatically purged after 7 days.
+          I consent to my photo being processed for the virtual fitting. Body photos are private, never shared, and deleted automatically after 7 days.
         </span>
-      </div>
+      </label>
 
       <div style={{ marginTop: "1rem", display: "flex", justifyContent: "flex-end" }}>
         <button

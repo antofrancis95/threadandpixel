@@ -174,11 +174,11 @@ export function VoiceHero({
 
         {voice.active && (
           <div className="voice-controls">
-            <button type="button" className="voice-ctl" onClick={voice.toggleMute} aria-pressed={voice.muted}>
+            <button type="button" className="secondary small" onClick={voice.toggleMute} aria-pressed={voice.muted}>
               {voice.muted ? <MicOffIcon size={14} /> : <MicIcon size={14} />}
               <span>{voice.muted ? "Unmute" : "Mute"}</span>
             </button>
-            <button type="button" className="voice-ctl end" onClick={voice.stop}>
+            <button type="button" className="secondary small end" onClick={voice.stop}>
               <CloseIcon size={13} />
               <span>End</span>
             </button>
@@ -187,11 +187,11 @@ export function VoiceHero({
 
         {ended && (
           <div className="voice-controls">
-            <button type="button" className="voice-ctl primary" onClick={voice.start}>
+            <button type="button" className="primary small" onClick={voice.start}>
               <RefreshIcon size={14} />
               <span>{voice.phase === "dropped" ? "Reconnect" : "Try again"}</span>
             </button>
-            <button type="button" className="voice-ctl" onClick={voice.stop}>
+            <button type="button" className="secondary small" onClick={voice.stop}>
               <span>Not now</span>
             </button>
           </div>
@@ -202,7 +202,7 @@ export function VoiceHero({
             <span className="voice-examples-label">Try saying</span>
             <div className="voice-example-chips">
               {EXAMPLE_UTTERANCES.map((text) => (
-                <button key={text} type="button" className="voice-example" onClick={() => onSay(text)}>
+                <button key={text} type="button" className="chip-btn say-chip" onClick={() => onSay(text)}>
                   “{text}”
                 </button>
               ))}
@@ -229,7 +229,7 @@ export function VoiceHero({
             <Captions voice={voice} compact />
           </div>
           <VoiceThread phase={voice.phase} tool={voice.tool} muted={voice.muted} levels={voice.levels} shape="siri" size={132} barHeight={40} />
-          <button type="button" className="voice-ctl end" onClick={voice.stop} aria-label="End the conversation" title="End the conversation">
+          <button type="button" className="secondary small end" onClick={voice.stop} aria-label="End the conversation" title="End the conversation">
             <CloseIcon size={13} />
             <span>End</span>
           </button>
@@ -241,11 +241,11 @@ export function VoiceHero({
             <p className="voice-status-primary">{status.primary}</p>
             {status.secondary && <p className="voice-status-secondary">{status.secondary}</p>}
           </div>
-          <button type="button" className="voice-ctl primary" onClick={voice.start}>
+          <button type="button" className="primary small" onClick={voice.start}>
             <RefreshIcon size={14} />
             <span>{voice.phase === "dropped" ? "Reconnect" : "Try again"}</span>
           </button>
-          <button type="button" className="voice-ctl" onClick={voice.stop} aria-label="Dismiss">
+          <button type="button" className="secondary small" onClick={voice.stop} aria-label="Dismiss">
             <CloseIcon size={13} />
           </button>
         </>

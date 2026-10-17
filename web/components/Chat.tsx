@@ -70,7 +70,7 @@ export function Chat({
       <div className="panel-head">
         <div>
           <h2>The Couturier</h2>
-          <span className="panel-subtitle" style={{ fontSize: "0.75rem", color: "var(--muted)" }}>Bespoke Couture Consultation</span>
+          <span className="panel-subtitle" style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>Bespoke Couture Consultation</span>
         </div>
         {headerAction}
       </div>
@@ -148,7 +148,7 @@ export function Chat({
       <form className="composer-atelier" onSubmit={submit}>
         <button
           type="button"
-          className={`composer-icon-btn ${activeWidget === "design_upload" ? "active" : ""}`}
+          className="secondary icon"
           onClick={() => onSelectWidget(activeWidget === "design_upload" ? null : "design_upload")}
           title="Upload a design image or sketch"
           aria-label="Upload a design image"
@@ -158,7 +158,7 @@ export function Chat({
         </button>
         <button
           type="button"
-          className={`composer-icon-btn ${activeWidget === "occasion_stylist" ? "active" : ""}`}
+          className="secondary icon"
           onClick={() => onSelectWidget(activeWidget === "occasion_stylist" ? null : "occasion_stylist")}
           title="Design an outfit for your occasion"
           aria-label="Design an outfit for your occasion"
