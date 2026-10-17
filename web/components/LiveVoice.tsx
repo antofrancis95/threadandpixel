@@ -453,10 +453,13 @@ export function useLiveVoice(options: LiveVoiceOptions): VoiceController {
             lastRole = "user";
             turnDone = false;
           } else {
+            // A new Couturier turn (after turn_complete, or after being cut off) starts a fresh
+            // caption; two turns in a row must not run into one sentence.
             patch((s) => ({
-              captions: s.captions.modelInterrupted
-                ? { ...s.captions, model: text, modelInterrupted: false }
-                : { ...s.captions, model: s.captions.model + text },
+              captions:
+                turnDone || s.captions.modelInterrupted
+                  ? { ...s.captions, model: text, modelInterrupted: false }
+                  : { ...s.captions, model: s.captions.model + text },
             }));
             lastRole = "model";
             turnDone = false;
