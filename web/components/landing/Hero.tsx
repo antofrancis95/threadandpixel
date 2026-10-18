@@ -3,14 +3,7 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { HeroCloth } from "./HeroCloth";
-
-function PlayGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M8 5.5v13l10-6.5z" />
-    </svg>
-  );
-}
+import { WatchFilm } from "./WatchFilm";
 
 export function Hero() {
   const ref = useRef<HTMLElement>(null);
@@ -33,10 +26,7 @@ export function Hero() {
           <Link href="/studio" className="lp-btn lp-btn-primary">
             Begin a Commission
           </Link>
-          <a href="#runway" className="lp-btn lp-btn-ghost">
-            <PlayGlyph />
-            Watch the Runway
-          </a>
+          <WatchFilm />
         </div>
       </div>
       <div className="lp-scroll-cue" aria-hidden="true">
