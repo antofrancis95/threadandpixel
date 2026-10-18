@@ -766,6 +766,57 @@ button.say svg {
   flex-shrink: 0;
 }
 
+/* A commissioned piece: the composer gives way to the seal and the next commission */
+.composer-sealed {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem 0.85rem;
+  margin-top: 0.85rem;
+  padding: 0.75rem 0.85rem 0.75rem 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--emerald-light);
+  flex-shrink: 0;
+}
+
+.composer-sealed-mark {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--emerald);
+  color: #FFFFFF;
+}
+
+.composer-sealed-text {
+  flex: 1;
+  min-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+}
+
+.composer-sealed-text strong {
+  color: var(--emerald);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-sealed button.primary {
+  height: 40px;
+  padding: 0 1.1rem;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 /* Right Showcase Panel (Couture Moodboard) */
 .showcase-panel {
   height: 100%;
@@ -1848,6 +1899,12 @@ button.say svg {
   gap: 0.25rem;
 }
 
+.archive-meta-chip.commissioned {
+  color: var(--emerald);
+  background: var(--emerald-light);
+  font-weight: 600;
+}
+
 .archive-active-indicator {
   position: absolute;
   top: 0.5rem;
@@ -2901,6 +2958,13 @@ button.say svg {
     gap: 0.4rem;
     padding-top: 0.6rem;
   }
+  .composer-sealed {
+    margin-top: 0.6rem;
+  }
+  .composer-sealed button.primary {
+    width: 100%;
+    justify-content: center;
+  }
   button.icon {
     width: 38px;
     height: 38px;
@@ -3798,6 +3862,10 @@ button.say svg {
   font-size: 0.72rem;
   color: var(--muted);
   white-space: nowrap;
+}
+
+.next-steps.sealed .next-steps-kicker {
+  color: var(--emerald);
 }
 
 /* Sentence chips in the chat: something you could say out loud */

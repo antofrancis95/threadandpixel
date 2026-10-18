@@ -15,7 +15,9 @@ export type StepAction =
   | { kind: "flats"; size?: string }
   | { kind: "tab"; tab: ShowcaseTab }
   | { kind: "techpack" }
-  | { kind: "talk" };
+  | { kind: "talk" }
+  /** Leave a sealed commission and start the next piece. */
+  | { kind: "new" };
 
 export type StepChip = { label: string; action: StepAction; primary?: boolean };
 
@@ -23,6 +25,8 @@ export type NextStep = {
   statuses: Record<Stage, StageStatus>;
   /** The stop the client is at; null once every stop is done. */
   stage: Stage | null;
+  /** The piece is commissioned: nothing on it changes any more. */
+  sealed: boolean;
   /** One sentence for the rail: what happens next. */
   sentence: string;
   /** The same step as something you can say aloud. */
@@ -60,6 +64,7 @@ export function nextStep(
   design: Design | null,
   opts: { hasQuote: boolean; suggestedAction: AtelierAction },
 ): NextStep {
+  if (design?.order_id) return sealedStep(design);
   const statuses = stageStatuses(design, opts.hasQuote);
   const stage = (Object.keys(statuses) as Stage[]).find((s) => statuses[s] === "current") ?? null;
   const consulting = Boolean(design) && !design?.image_url;
@@ -124,7 +129,23 @@ export function nextStep(
     }
   }
 
-  return { statuses, stage, sentence, say, action, chips };
+  return { statuses, stage, sentence, say, action, chips, sealed: false };
+}
+
+/** A commissioned piece: the stops it reached stay done, the rest were skipped, and the only way on is a new commission. */
+function sealedStep(design: Design): NextStep {
+  const reached = stageStatuses(design, true);
+  const statuses = {} as Record<Stage, StageStatus>;
+  for (const s of STAGES) statuses[s.id] = reached[s.id] === "done" ? "done" : "todo";
+  return {
+    statuses,
+    stage: null,
+    sealed: true,
+    sentence: "Sent to the atelier. This piece is sealed.",
+    say: "Start a new commission",
+    action: { kind: "new" },
+    chips: [],
+  };
 }
 
 function stepFor(stage: Stage, size?: string): StepChip | null {
