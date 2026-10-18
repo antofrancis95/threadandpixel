@@ -2553,16 +2553,6 @@ button.say svg {
   font-style: italic;
   color: var(--gold);
 }
-.factory .live {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.66rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--emerald);
-  font-weight: 600;
-}
 @media (max-width: 767px) {
   .factory {
     padding: 1rem;
@@ -2573,50 +2563,10 @@ button.say svg {
   }
 }
 
-.factory-gate {
-  max-width: 560px;
-  gap: 0.75rem;
-  padding: 2rem 2.25rem;
-  align-items: flex-start;
-}
-.factory-gate h2 {
-  font-size: 1.9rem;
-  margin: 0;
-}
-.factory-gate .hint {
-  color: var(--ink-secondary);
-  margin: 0 0 0.5rem;
-}
-.factory-gate button.primary {
-  align-self: flex-start;
-}
 
 /* =========================================================================
-   Factory portal: order detail helpers and the sign-out control
+   Factory portal: order gallery (the rest lives in app/factory/factory.css)
    ========================================================================= */
-.factory .topbar nav button {
-  border: 1px solid var(--line);
-  background: var(--surface);
-  padding: 0.45rem 0.9rem;
-  font-size: 0.82rem;
-}
-.factory .row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-bottom: 1rem;
-}
-.factory .row button {
-  border: 1px solid var(--line);
-  background: var(--surface);
-  padding: 0.45rem 0.9rem;
-  text-transform: capitalize;
-}
-.factory .row button.primary {
-  background: linear-gradient(180deg, #2D2926 0%, #1A1817 100%);
-  color: #FFFFFF;
-  border-color: var(--ink);
-}
 .factory .gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -2632,21 +2582,6 @@ button.say svg {
   border: 1px solid var(--line-light);
   background: var(--ivory);
   display: block;
-}
-.factory-gate code {
-  display: block;
-  padding: 0.5rem 0.75rem;
-  background: rgba(26, 24, 23, 0.06);
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
-  overflow-wrap: anywhere;
-}
-.factory-gate p button {
-  display: inline;
-  padding: 0;
-  color: var(--gold-hover);
-  text-decoration: underline;
-  font-size: inherit;
 }
 
 /* Desktop keeps the text-only Send button; the icon is for phones. */
@@ -3107,12 +3042,6 @@ button.say svg {
   }
   .factory-grid {
     gap: 1rem;
-  }
-  .factory-gate {
-    padding: 1.5rem 1.15rem;
-  }
-  .factory-gate h2 {
-    font-size: 1.6rem;
   }
   /* The orders table collapses into a stack of order cards. */
   .orders thead {
