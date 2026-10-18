@@ -1,0 +1,419 @@
+/* =========================================================================
+   Factory Portal: queue, figures and order detail
+   Uses the app tokens and the studio's classes (panel, receipt-stats,
+   receipt-lines, complexity-badge, spec-chip); only adds what the floor needs.
+   ========================================================================= */
+
+.factory-grid {
+  align-items: start;
+}
+@media (min-width: 1100px) {
+  .factory-grid {
+    grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1100px) {
+  .factory-detail {
+    position: sticky;
+    top: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+}
+
+/* ---------- Header ---------- */
+.factory .topbar .brand h1 {
+  font-size: 1.45rem;
+}
+.factory-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--emerald);
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+.factory-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--emerald);
+  animation: factoryPulse 1.6s ease-in-out infinite;
+}
+@keyframes factoryPulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---------- Figures above the queue ---------- */
+.factory-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+}
+.factory-stats > div {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--line-light);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  min-width: 0;
+}
+.factory-stats dt {
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.factory-stats dd {
+  margin: 0.3rem 0 0.15rem;
+  font-family: var(--font-serif);
+  font-size: 1.6rem;
+  line-height: 1.1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.factory-stats dd em {
+  font-size: 0.85rem;
+  color: var(--gold-dark);
+}
+.factory-stats small {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+.factory-stats > div.is-alert {
+  border-color: rgba(168, 88, 88, 0.3);
+  background: var(--rose-light);
+}
+.factory-stats > div.is-alert dt,
+.factory-stats > div.is-alert dd,
+.factory-stats > div.is-alert small {
+  color: var(--rose);
+}
+
+/* ---------- Queue ---------- */
+.orders .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.orders td {
+  font-variant-numeric: tabular-nums;
+}
+.order-open {
+  padding: 0.15rem 0.35rem;
+  margin: -0.15rem -0.35rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.order-open:hover {
+  color: var(--gold-dark);
+}
+.order-open:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.order-open[aria-busy="true"] {
+  opacity: 0.55;
+}
+.garment-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+.garment-name {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+.garment-name b {
+  font-weight: 500;
+}
+.garment-name small {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.orders td.col-status {
+  white-space: nowrap;
+}
+.factory-flag {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 0.4rem;
+  color: var(--rose);
+}
+.orders tr.is-fresh {
+  animation: factoryFresh 6s var(--ease);
+}
+@keyframes factoryFresh {
+  0%,
+  40% {
+    background: var(--gold-light);
+    box-shadow: inset 3px 0 0 var(--gold);
+  }
+  100% {
+    background: transparent;
+    box-shadow: inset 3px 0 0 transparent;
+  }
+}
+.orders tbody tr.factory-group,
+.orders tbody tr.factory-empty {
+  cursor: default;
+}
+.orders tbody tr.factory-group:hover,
+.orders tbody tr.factory-empty:hover {
+  background: transparent;
+}
+.orders tr.factory-group th {
+  padding-top: 1.4rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  color: var(--gold-dark);
+}
+.orders tr.factory-group th span {
+  margin-left: 0.5rem;
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* ---------- Order detail ---------- */
+.factory-detail .panel-head {
+  gap: 0.75rem;
+}
+.factory-detail .panel-head h2:focus {
+  outline: none;
+}
+.factory-detail .panel-head h2:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.factory-sample-tag {
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  background: var(--gold-light);
+  color: var(--gold-dark);
+  border: 1px solid rgba(197, 168, 128, 0.4);
+}
+.factory-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.factory-status-row button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0.45rem 0.95rem;
+  text-transform: capitalize;
+}
+.factory-status-row button.primary {
+  background: linear-gradient(180deg, #2d2926 0%, #1a1817 100%);
+  color: #fff;
+  border-color: var(--ink);
+}
+.factory-detail .receipt-stats {
+  margin: 0;
+}
+.factory-issues {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(168, 88, 88, 0.25);
+  border-radius: var(--radius-md);
+  background: var(--rose-light);
+  color: var(--rose);
+  font-size: var(--text-sm);
+}
+.factory-issues-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-weight: 600;
+}
+.factory-issues ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.4rem;
+  color: var(--ink-secondary);
+}
+.factory-issues li + li {
+  margin-top: 0.25rem;
+}
+.factory .gallery {
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  margin: 0;
+}
+.factory .gallery figure {
+  margin: 0;
+}
+.factory .gallery figcaption {
+  margin-top: 0.3rem;
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.factory-swatch-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line-light);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+}
+.factory-swatch-chip {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.25);
+}
+.factory-swatch-card b {
+  display: block;
+  font-weight: 600;
+  font-size: var(--text-base);
+}
+.factory-swatch-card small {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.factory-block h3 {
+  font-size: 1.05rem;
+  margin: 0 0 0.55rem;
+}
+.factory-spec {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 1rem;
+  margin: 0;
+  font-size: var(--text-base);
+}
+.factory-spec > div.wide {
+  grid-column: 1 / -1;
+}
+.factory-spec dt {
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+.factory-spec dd {
+  margin: 0.1rem 0 0;
+  color: var(--ink);
+}
+.factory-detail .receipt-lines {
+  margin: 0;
+}
+.factory-steps {
+  margin: 0;
+  padding-left: 1.3rem;
+  font-size: var(--text-base);
+  color: var(--ink-secondary);
+}
+.factory-steps li + li {
+  margin-top: 0.3rem;
+}
+.factory-seams {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.75rem 0 0;
+}
+.factory-label {
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  margin-right: 0.2rem;
+}
+.factory-detail-empty {
+  color: var(--muted);
+  font-size: var(--text-base);
+}
+.factory-detail-empty p {
+  margin: 0;
+}
+
+/* ---------- Tablet and phone ---------- */
+@media (max-width: 900px) {
+  .factory-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 767px) {
+  .factory .topbar .brand h1 {
+    font-size: 1.15rem;
+  }
+  .factory-live {
+    display: none;
+  }
+  .factory-stats dd {
+    font-size: 1.3rem;
+  }
+  .factory-spec {
+    grid-template-columns: 1fr;
+  }
+  .orders td.col-yd {
+    order: 5;
+  }
+  .orders td.col-hours {
+    order: 6;
+  }
+  .orders td.col-total {
+    order: 7;
+  }
+  .orders tbody tr.factory-group,
+  .orders tbody tr.factory-group:hover {
+    border: 0;
+    background: transparent;
+    padding: 0.75rem 0 0.25rem;
+  }
+  .orders tr.factory-group th {
+    padding: 0;
+  }
+  .orders tr.factory-group th span {
+    display: block;
+    margin: 0.2rem 0 0;
+  }
+  .orders tbody tr.factory-empty {
+    border-style: dashed;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .factory-live i,
+  .orders tr.is-fresh {
+    animation: none;
+  }
+  .orders tr.is-fresh {
+    background: var(--gold-light);
+  }
+}
