@@ -27,6 +27,28 @@ def owned_design(design_id: str, user: User) -> tuple[firestore.DocumentReferenc
     return ref, snap.to_dict()
 
 
+COMMISSIONED = "This piece is already commissioned. Start a new commission to design another."
+
+
+def ensure_open(data: dict) -> None:
+    """A commissioned design is what the atelier is making, so it no longer changes."""
+    if data.get("order_id"):
+        raise HTTPException(status.HTTP_409_CONFLICT, COMMISSIONED)
+
+
+def order_for(ref: firestore.DocumentReference, data: dict) -> str | None:
+    """The order this design was commissioned as. Designs ordered before the design kept the order id
+    are found through the orders collection."""
+    if data.get("order_id"):
+        return data["order_id"]
+    try:
+        docs = list(db().collection("orders").where("design_id", "==", ref.id).select(["design_id"]).limit(1).stream())
+    except Exception as exc:  # an offline emulator must not break the design load
+        log.warning("order lookup failed: %s", exc)
+        return None
+    return docs[0].id if docs else None
+
+
 def history(ref: firestore.DocumentReference, limit: int = 50) -> list[dict]:
     snap = ref.get()
     if snap.exists:
@@ -87,6 +109,7 @@ def restore_version_service(user: User, design_id: str, version: int) -> dict:
     them; the spec comes back with the version when it was stored, otherwise the current spec stays.
     """
     ref, data = owned_design(design_id, user)
+    ensure_open(data)
     snap = ref.collection("versions").document(str(version)).get()
     if not snap.exists:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Version not found")
@@ -162,6 +185,7 @@ def design_response(
         "messages": data.get("messages", []),
         "suggested_action": suggested_action or data.get("suggested_action", "none"),
         "is_off_topic": is_off_topic,
+        "order_id": data.get("order_id"),
     }
 
 
@@ -444,6 +468,7 @@ def create_design_for_occasion(
 
 def continue_design(user: User, design_id: str, msg: MessageIn, force_sketch: bool = False) -> dict:
     ref, data = owned_design(design_id, user)
+    ensure_open(data)
     existing_person_path = data.get("person_upload_path")
     if not existing_person_path:
         u_snap = db().collection("users").document(user.uid).get()
@@ -582,6 +607,7 @@ def generate_flats_service(
     choosing a different size drops them, since they no longer describe that size.
     """
     ref, data = owned_design(design_id, user)
+    ensure_open(data)
     if not data.get("current_image_path"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Garment must be sketched before drafting technical flats.")
     current, mime = storage.download(data["current_image_path"])
@@ -607,6 +633,7 @@ def generate_flats_service(
 def create_techpack_service(user: User, design_id: str, size: str, measurements: dict | None = None) -> dict:
     """Tech pack critique plus a deterministic price quote for the design's current version, saved for ordering."""
     ref, data = owned_design(design_id, user)
+    ensure_open(data)
     spec = DesignSpec.model_validate(data["spec"])
     if not data.get("current_image_path"):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Garment must be sketched before it can be quoted.")

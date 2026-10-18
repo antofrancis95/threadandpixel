@@ -134,6 +134,7 @@ export function ArchiveDrawer({
                       <span className="archive-item-date">{dateStr}</span>
                     </span>
                     <span className="archive-item-meta">
+                      {d.order_id && <span className="archive-meta-chip commissioned">Commissioned</span>}
                       <span className="archive-meta-chip">v{d.version}</span>
                       {d.spec?.color_hex && (
                         <span className="archive-meta-chip">

@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
+  CheckIcon,
   ImageIcon,
   PartyIcon,
+  PlusIcon,
   SendIcon,
   SparkleIcon,
 } from "@/components/icons";
@@ -25,6 +27,7 @@ export function Chat({
   chips,
   onChip,
   dockHint,
+  sealed,
 }: {
   messages: ChatMessage[];
   busy: boolean;
@@ -39,6 +42,8 @@ export function Chat({
   onChip: (action: StepAction) => void;
   /** What comes next, shown beside the idle mic in the dock. */
   dockHint?: string;
+  /** The piece is commissioned: the conversation is closed and only a new commission goes on. */
+  sealed?: { orderId: string; onNewCommission: () => void };
 }) {
   const [text, setText] = useState("");
   const streamRef = useRef<HTMLDivElement>(null);
@@ -150,45 +155,63 @@ export function Chat({
         )}
       </div>
 
-      {(messages.length > 0 || voice.active || activeWidget) && <VoiceHero voice={voice} variant="dock" hint={dockHint} />}
+      {sealed ? (
+        <div className="composer-sealed" role="status">
+          <span className="composer-sealed-mark" aria-hidden="true">
+            <CheckIcon size={15} />
+          </span>
+          <span className="composer-sealed-text">
+            <strong>Commissioned · #{sealed.orderId.slice(0, 8)}</strong>
+            <span>Sent to the atelier, so this piece is sealed. Your next idea starts a new commission.</span>
+          </span>
+          <button type="button" className="primary" onClick={sealed.onNewCommission}>
+            <PlusIcon size={14} />
+            <span>Start a new commission</span>
+          </button>
+        </div>
+      ) : (
+        <>
+          {(messages.length > 0 || voice.active || activeWidget) && <VoiceHero voice={voice} variant="dock" hint={dockHint} />}
 
-      <form className="composer-atelier" onSubmit={submit}>
-        <button
-          type="button"
-          className="secondary icon"
-          onClick={() => onSelectWidget(activeWidget === "design_upload" ? null : "design_upload")}
-          title="Upload a design image or sketch"
-          aria-label="Upload a design image"
-          aria-pressed={activeWidget === "design_upload"}
-        >
-          <ImageIcon size={17} />
-        </button>
-        <button
-          type="button"
-          className="secondary icon"
-          onClick={() => onSelectWidget(activeWidget === "occasion_stylist" ? null : "occasion_stylist")}
-          title="Design an outfit for your occasion"
-          aria-label="Design an outfit for your occasion"
-          aria-pressed={activeWidget === "occasion_stylist"}
-        >
-          <PartyIcon size={17} />
-        </button>
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={
-            voice.active
-              ? "Type to the Couturier, or just say it…"
-              : "Describe or refine your silhouette, e.g. “make the sleeves sheer”"
-          }
-          maxLength={2000}
-          aria-label="Message the Couturier"
-        />
-        <button type="submit" className="primary composer-send-btn" disabled={busy || !text.trim()} aria-label="Send">
-          <SendIcon size={17} className="composer-send-icon" />
-          <span className="composer-send-label">Send</span>
-        </button>
-      </form>
+          <form className="composer-atelier" onSubmit={submit}>
+            <button
+              type="button"
+              className="secondary icon"
+              onClick={() => onSelectWidget(activeWidget === "design_upload" ? null : "design_upload")}
+              title="Upload a design image or sketch"
+              aria-label="Upload a design image"
+              aria-pressed={activeWidget === "design_upload"}
+            >
+              <ImageIcon size={17} />
+            </button>
+            <button
+              type="button"
+              className="secondary icon"
+              onClick={() => onSelectWidget(activeWidget === "occasion_stylist" ? null : "occasion_stylist")}
+              title="Design an outfit for your occasion"
+              aria-label="Design an outfit for your occasion"
+              aria-pressed={activeWidget === "occasion_stylist"}
+            >
+              <PartyIcon size={17} />
+            </button>
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={
+                voice.active
+                  ? "Type to the Couturier, or just say it…"
+                  : "Describe or refine your silhouette, e.g. “make the sleeves sheer”"
+              }
+              maxLength={2000}
+              aria-label="Message the Couturier"
+            />
+            <button type="submit" className="primary composer-send-btn" disabled={busy || !text.trim()} aria-label="Send">
+              <SendIcon size={17} className="composer-send-icon" />
+              <span className="composer-send-label">Send</span>
+            </button>
+          </form>
+        </>
+      )}
     </section>
   );
 }

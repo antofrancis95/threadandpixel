@@ -22,11 +22,13 @@ from .service import (
     create_design_from_image,
     create_techpack_service,
     design_response,
+    ensure_open,
     generate_flats_service,
     history,
     job_response,
     latest_quote,
     list_versions_service,
+    order_for,
     owned_design,
     restore_version_service,
     start_runway_service,
@@ -97,6 +99,14 @@ def get_catalog():
 @app.get("/designs")
 def list_designs(user: User = Depends(current_user)):
     snaps = db().collection("designs").where("uid", "==", user.uid).stream()
+    # Designs ordered before the design kept its order id are matched through the orders.
+    try:
+        ordered = {
+            o.get("design_id"): o.id
+            for o in db().collection("orders").where("uid", "==", user.uid).select(["design_id"]).stream()
+        }
+    except Exception:
+        ordered = {}
     items = []
     for s in snaps:
         d = s.to_dict()
@@ -111,6 +121,7 @@ def list_designs(user: User = Depends(current_user)):
             "messages_count": len(d.get("messages", [])),
             "updated_at": str(d.get("updated_at") or d.get("created_at") or ""),
             "created_at": str(d.get("created_at") or ""),
+            "order_id": d.get("order_id") or ordered.get(s.id),
         })
     items.sort(key=lambda x: x["updated_at"] or x["created_at"] or "", reverse=True)
     return items
@@ -188,6 +199,7 @@ def get_design(design_id: str, user: User = Depends(current_user)):
         msgs = history(ref, limit=50)
     result["messages"] = msgs
     result["latest_quote"] = latest_quote(ref, data.get("current_version", 0))
+    result["order_id"] = order_for(ref, data)
     return result
 
 
@@ -338,6 +350,7 @@ def create_techpack(design_id: str, body: TechPackIn, user: User = Depends(curre
 @app.post("/designs/{design_id}/order")
 def create_order(design_id: str, body: OrderIn, user: User = Depends(current_user)):
     ref, data = owned_design(design_id, user)
+    ensure_open(data | {"order_id": order_for(ref, data)})
     q = ref.collection("quotes").document(body.quote_id).get()
     if not q.exists:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Quote not found")
@@ -362,6 +375,8 @@ def create_order(design_id: str, body: OrderIn, user: User = Depends(current_use
         "status": "new",
         "created_at": firestore.SERVER_TIMESTAMP,
     })
+    # The design is now sealed: what the atelier makes is what was ordered.
+    ref.update({"order_id": order_ref.id, "ordered_at": firestore.SERVER_TIMESTAMP, "suggested_action": "none"})
     return {"order_id": order_ref.id}
 
 

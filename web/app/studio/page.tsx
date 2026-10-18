@@ -207,6 +207,19 @@ export default function AtelierStudio() {
     suggestedAction: (design?.suggested_action as AtelierAction) ?? null,
   });
 
+  // Once commissioned the piece is sealed: the atelier makes what was ordered, so nothing on it
+  // changes. Only the receipt can open, and an empty tab says it was never made instead of offering to make it.
+  const commissioned = Boolean(design?.order_id);
+  const shownWidget: AtelierAction = commissioned && activeWidget !== "commission" ? null : activeWidget;
+  const sealedWithout =
+    commissioned && activeTab !== "editorial" && !design?.[`${activeTab}_url` as "flats_url" | "tryon_url" | "runway_url"];
+
+  // A live call must not go on editing a sealed piece.
+  useEffect(() => {
+    if (commissioned && voice.active) voice.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commissioned, voice.active]);
+
   // Mobile shell: on phones the chat and the showcase are two full-height
   // panes behind a segmented switcher (see globals.css, max-width 767px).
   const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
@@ -718,6 +731,9 @@ export default function AtelierStudio() {
         break;
       case "talk":
         voice.start();
+        break;
+      case "new":
+        startOver();
         break;
     }
   }
@@ -1270,12 +1286,13 @@ export default function AtelierStudio() {
           messages={messages}
           busy={busy}
           onSend={send}
-          activeWidget={activeWidget}
+          activeWidget={shownWidget}
           onSelectWidget={setActiveWidget}
           voice={voice}
           chips={step.chips}
           onChip={runStep}
           dockHint={design && step.stage ? `Next: say “${step.say}”` : undefined}
+          sealed={design?.order_id ? { orderId: design.order_id, onNewCommission: startOver } : undefined}
           widgetContent={
             activeWidget === "design_upload" ? (
               <DesignUploadCard
@@ -1325,9 +1342,16 @@ export default function AtelierStudio() {
               />
             ) : activeWidget === "commission" && design && quoteData ? (
               <CommissionCard
+                key={design.design_id}
                 designId={design.design_id}
                 data={quoteData}
-                onOrderPlaced={() => setActiveWidget(null)}
+                placedOrderId={design.order_id}
+                onOrderPlaced={(orderId) => {
+                  // The receipt stays open; the design is sealed from here on.
+                  const id = design.design_id;
+                  setDesign((d) => (d && d.design_id === id ? { ...d, order_id: orderId } : d));
+                  loadArchive();
+                }}
                 onClose={() => setActiveWidget(null)}
               />
             ) : null
@@ -1474,6 +1498,14 @@ export default function AtelierStudio() {
                       Back to current
                     </button>
                   </div>
+                ) : sealedWithout ? (
+                  <div className="asset-empty-state">
+                    <span className="mannequin-badge">✦ Commissioned</span>
+                    <h3 className="asset-empty-title">
+                      {activeTab === "flats" ? "Commissioned without technical flats" : activeTab === "tryon" ? "Commissioned without a fitting" : "Commissioned without a runway film"}
+                    </h3>
+                    <p className="asset-empty-desc">The piece is sealed as it was sent to the atelier.</p>
+                  </div>
                 ) : assetErrors[activeTab] ? (
                   <div className="asset-empty-state">
                     <div className="asset-empty-icon-ring error">
@@ -1484,7 +1516,7 @@ export default function AtelierStudio() {
                     <p className="asset-empty-desc">
                       The media preview for this {activeTab} asset could not be loaded or has expired.
                     </p>
-                    {activeTab === "flats" ? (
+                    {activeTab === "flats" && !commissioned ? (
                       <button
                         type="button"
                         className="primary"
@@ -1496,7 +1528,7 @@ export default function AtelierStudio() {
                       >
                         <RefreshIcon size={14} /> <span>Re-draft Technical Flats</span>
                       </button>
-                    ) : activeTab === "tryon" ? (
+                    ) : activeTab === "tryon" && !commissioned ? (
                       <button
                         type="button"
                         className="primary"
@@ -1507,7 +1539,7 @@ export default function AtelierStudio() {
                       >
                         <MirrorIcon size={14} /> <span>Re-open Fitting Room</span>
                       </button>
-                    ) : activeTab === "runway" ? (
+                    ) : activeTab === "runway" && !commissioned ? (
                       <button
                         type="button"
                         className="primary"
@@ -1553,21 +1585,23 @@ export default function AtelierStudio() {
                         <span style={{ fontSize: "var(--text-xs)", color: "var(--ink-secondary)" }}>
                           Calibrated: <strong style={{ color: "var(--gold-dark)" }}>{viewed.spec.size ? `Size ${viewed.spec.size}` : "Proportional Draft"}</strong>
                         </span>
-                        <div style={{ display: "flex", gap: "0.3rem", alignItems: "center" }}>
-                          <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginRight: "0.2rem" }}>Re-calibrate:</span>
-                          {(["XS", "S", "M", "L", "XL", "XXL"] as const).map((sz) => (
-                            <button
-                              key={sz}
-                              type="button"
-                              className={`chip-btn ${viewed.spec.size === sz ? "highlight" : ""}`}
-                              style={{ padding: "0.2rem 0.45rem", fontSize: "var(--text-xs)" }}
-                              onClick={() => generateFlats(sz)}
-                              disabled={busy}
-                            >
-                              {sz}
-                            </button>
-                          ))}
-                        </div>
+                        {!commissioned && (
+                          <div style={{ display: "flex", gap: "0.3rem", alignItems: "center" }}>
+                            <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginRight: "0.2rem" }}>Re-calibrate:</span>
+                            {(["XS", "S", "M", "L", "XL", "XXL"] as const).map((sz) => (
+                              <button
+                                key={sz}
+                                type="button"
+                                className={`chip-btn ${viewed.spec.size === sz ? "highlight" : ""}`}
+                                style={{ padding: "0.2rem 0.45rem", fontSize: "var(--text-xs)" }}
+                                onClick={() => generateFlats(sz)}
+                                disabled={busy}
+                              >
+                                {sz}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1742,7 +1776,7 @@ export default function AtelierStudio() {
                 current={design.version}
                 viewing={lookingBack ? viewingVersion : null}
                 onView={setViewingVersion}
-                onRestore={restoreVersion}
+                onRestore={commissioned ? undefined : restoreVersion}
                 restoring={restoring}
               />
             )}
@@ -1761,54 +1795,91 @@ export default function AtelierStudio() {
 
               {/* One row of secondary actions; upload and occasion live in the composer, the next step in the rail */}
               <div className="showcase-actions">
-                <button
-                  type="button"
-                  className="secondary small"
-                  aria-pressed={activeWidget === "measurements"}
-                  onClick={() => setActiveWidget(activeWidget === "measurements" ? null : "measurements")}
-                >
-                  <ScissorsIcon size={13} />
-                  <span>Measurements</span>
-                </button>
-                <button
-                  type="button"
-                  className="secondary small"
-                  aria-pressed={activeWidget === "fitting"}
-                  onClick={() => setActiveWidget(activeWidget === "fitting" ? null : "fitting")}
-                >
-                  <MirrorIcon size={13} />
-                  <span>Fitting room</span>
-                </button>
-                <button
-                  type="button"
-                  className="secondary small"
-                  onClick={() => runStep({ kind: "flats", size: design.spec.size })}
-                  disabled={busy}
-                >
-                  <RulerIcon size={13} />
-                  <span>{design.flats_url ? "View flats" : "Draft flats"}</span>
-                </button>
-                <button
-                  type="button"
-                  className="secondary small"
-                  aria-pressed={activeWidget === "runway"}
-                  onClick={() => {
-                    setActiveWidget("runway");
-                    if (design.runway_url) setActiveTab("runway");
-                  }}
-                >
-                  <FilmIcon size={13} />
-                  <span>{design.runway_url ? "Runway" : "Film runway"}</span>
-                </button>
-                <button
-                  type="button"
-                  className="secondary small"
-                  aria-pressed={activeWidget === "commission"}
-                  onClick={() => runStep({ kind: "techpack" })}
-                >
-                  <ClipboardIcon size={13} />
-                  <span>Tech pack</span>
-                </button>
+                {commissioned ? (
+                  // Sealed: look at what was commissioned, make nothing new.
+                  <>
+                    {design.flats_url && (
+                      <button type="button" className="secondary small" onClick={() => runStep({ kind: "tab", tab: "flats" })}>
+                        <RulerIcon size={13} />
+                        <span>View flats</span>
+                      </button>
+                    )}
+                    {design.tryon_url && (
+                      <button type="button" className="secondary small" onClick={() => runStep({ kind: "tab", tab: "tryon" })}>
+                        <MirrorIcon size={13} />
+                        <span>Fitting</span>
+                      </button>
+                    )}
+                    {design.runway_url && (
+                      <button type="button" className="secondary small" onClick={() => runStep({ kind: "tab", tab: "runway" })}>
+                        <FilmIcon size={13} />
+                        <span>Runway</span>
+                      </button>
+                    )}
+                    {quoteData && (
+                      <button
+                        type="button"
+                        className="secondary small"
+                        aria-pressed={activeWidget === "commission"}
+                        onClick={() => setActiveWidget(activeWidget === "commission" ? null : "commission")}
+                      >
+                        <ClipboardIcon size={13} />
+                        <span>Tech pack</span>
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="secondary small"
+                      aria-pressed={activeWidget === "measurements"}
+                      onClick={() => setActiveWidget(activeWidget === "measurements" ? null : "measurements")}
+                    >
+                      <ScissorsIcon size={13} />
+                      <span>Measurements</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary small"
+                      aria-pressed={activeWidget === "fitting"}
+                      onClick={() => setActiveWidget(activeWidget === "fitting" ? null : "fitting")}
+                    >
+                      <MirrorIcon size={13} />
+                      <span>Fitting room</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary small"
+                      onClick={() => runStep({ kind: "flats", size: design.spec.size })}
+                      disabled={busy}
+                    >
+                      <RulerIcon size={13} />
+                      <span>{design.flats_url ? "View flats" : "Draft flats"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary small"
+                      aria-pressed={activeWidget === "runway"}
+                      onClick={() => {
+                        setActiveWidget("runway");
+                        if (design.runway_url) setActiveTab("runway");
+                      }}
+                    >
+                      <FilmIcon size={13} />
+                      <span>{design.runway_url ? "Runway" : "Film runway"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary small"
+                      aria-pressed={activeWidget === "commission"}
+                      onClick={() => runStep({ kind: "techpack" })}
+                    >
+                      <ClipboardIcon size={13} />
+                      <span>Tech pack</span>
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}

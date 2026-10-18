@@ -18,17 +18,21 @@ import type { QuoteResponse } from "@/lib/types";
 export function CommissionCard({
   designId,
   data,
+  placedOrderId = null,
   onOrderPlaced,
   onClose,
 }: {
   designId: string;
   data: QuoteResponse;
+  /** The order this design was already commissioned as; the card then shows the receipt, not the button. */
+  placedOrderId?: string | null;
   onOrderPlaced: (orderId: string) => void;
   onClose?: () => void;
 }) {
   const { api } = useApp();
   const [busy, setBusy] = useState(false);
-  const [orderId, setOrderId] = useState<string | null>(null);
+  const [newOrderId, setOrderId] = useState<string | null>(null);
+  const orderId = placedOrderId ?? newOrderId;
   const [error, setError] = useState<string | null>(null);
 
   async function handleOrder() {

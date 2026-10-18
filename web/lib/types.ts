@@ -30,6 +30,8 @@ export type Design = {
   is_off_topic?: boolean;
   /** The most recent quote, when it still describes this version. */
   latest_quote?: QuoteResponse | null;
+  /** Set once the piece is commissioned; the design is sealed from then on. */
+  order_id?: string | null;
 };
 
 export type DesignSummary = {
@@ -40,6 +42,7 @@ export type DesignSummary = {
   messages_count: number;
   updated_at: string;
   created_at: string;
+  order_id?: string | null;
 };
 
 export type AtelierAction =
